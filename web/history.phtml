@@ -19,7 +19,7 @@
       my $histFile  = $histObj->getFileName;
       my $status    = $histObj->getStatus;
       my $repeated  = $histObj->getRepeated;
-      my $timestampText = &Date::Manip::UnixDate($timestamp, "%C");
+      my $timestampText = &Date::Manip::UnixDate("epoch $timestamp", "%C");
       my $statusColor = $STATUS_FGCOLOR{$status};
       my $repeatedText = ($repeated > 1) ? " (Repeated $repeated times)" : '';
    -->

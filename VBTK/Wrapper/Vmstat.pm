@@ -4,8 +4,8 @@
 #                       Any changes made without RCS will be lost
 #
 #              $Source: /usr/local/cvsroot/vbtk/VBTK/Wrapper/Vmstat.pm,v $
-#            $Revision: 1.5 $
-#                $Date: 2002/02/13 07:36:14 $
+#            $Revision: 1.9 $
+#                $Date: 2002/03/04 20:53:08 $
 #              $Author: bhenry $
 #              $Locker:  $
 #               $State: Exp $
@@ -32,6 +32,18 @@
 #       REVISION HISTORY:
 #
 #       $Log: Vmstat.pm,v $
+#       Revision 1.9  2002/03/04 20:53:08  bhenry
+#       *** empty log message ***
+#
+#       Revision 1.8  2002/03/04 16:49:10  bhenry
+#       Changed requirement back to perl 5.6.0
+#
+#       Revision 1.7  2002/03/02 00:53:56  bhenry
+#       Documentation updates
+#
+#       Revision 1.6  2002/02/20 20:41:35  bhenry
+#       *** empty log message ***
+#
 #       Revision 1.5  2002/02/13 07:36:14  bhenry
 #       Disabled RrdLogRecovery and removed use of @log
 #
@@ -50,7 +62,7 @@
 
 package VBTK::Wrapper::Vmstat;
 
-use 5.6.1;
+use 5.6.0;
 use strict;
 use warnings;
 # I like using undef as a value so I'm turning off the uninitialized warnings
@@ -180,7 +192,7 @@ sub addVBObj
         ExpireAfter         => "$expireAfterSec seconds",
         Description         => $description,
         RrdTimeCol          => undef,
-        RrdColumns          => [ '$data[19]', '$data[20]', '$data[0]', '$data[11]' ],
+        RrdColumns          => [ '$data[20]', '$data[21]', '$data[1]', '$data[12]' ],
         RrdFilter           => undef,
         RrdMin              => undef,
         RrdMax              => undef,
@@ -220,16 +232,6 @@ __END__
 =head1 NAME
 
 VBTK::Wrapper::Vmstat - System monitoring with 'vmstat'
-
-=head1 SUPPORTED PLATFORMS
-
-=over 4
-
-=item * 
-
-Solaris
-
-=back
 
 =head1 SYNOPSIS
 

@@ -5,8 +5,8 @@
 #                       Any changes made without RCS will be lost
 #
 #              $Source: /usr/local/cvsroot/vbtk/VBTK/DynPod2Html.pm,v $
-#            $Revision: 1.4 $
-#                $Date: 2002/02/08 02:16:04 $
+#            $Revision: 1.9 $
+#                $Date: 2002/03/04 20:53:06 $
 #              $Author: bhenry $
 #              $Locker:  $
 #               $State: Exp $
@@ -32,6 +32,21 @@
 #       REVISION HISTORY:
 #
 #       $Log: DynPod2Html.pm,v $
+#       Revision 1.9  2002/03/04 20:53:06  bhenry
+#       *** empty log message ***
+#
+#       Revision 1.8  2002/03/04 16:49:09  bhenry
+#       Changed requirement back to perl 5.6.0
+#
+#       Revision 1.7  2002/03/02 00:53:54  bhenry
+#       Documentation updates
+#
+#       Revision 1.6  2002/02/20 19:25:12  bhenry
+#       Fixed bug causing loss of end of html page
+#
+#       Revision 1.5  2002/02/19 19:06:44  bhenry
+#       *** empty log message ***
+#
 #       Revision 1.4  2002/02/08 02:16:04  bhenry
 #       *** empty log message ***
 #
@@ -39,7 +54,7 @@
 
 package VBTK::DynPod2Html;
 
-use 5.6.1;
+use 5.6.0;
 use strict;
 use warnings;
 # I like using undef as a value so I'm turning off the uninitialized warnings
@@ -101,33 +116,22 @@ sub genPodHtml
 
     &log("Generating HTML for '$pkgName' from '$podFile'") if ($VERBOSE > 1);
 
-    pipe (RDR, WTR) || &fatal("genPodHtml: Can't create pipe");
-#    WTR->autoflush(1);
-
-    if($pid = fork)
+    if($pid = open(CHILD_STDOUT, "-|"))    
     {
         &log("In parent, waiting for response from child") if ($VERBOSE > 3);
-        WTR->close();
-        @html = <RDR>;
-        
-        RDR->close();
+        @html = <CHILD_STDOUT>;
+        close(CHILD_STDOUT);
         waitpid $pid, 0;
     }
     elsif(defined $pid)
     {
-        &log("In child, preparing to run pod2html") if ($VERBOSE > 3);
-
-        STDIN->close();
-        RDR->close();
-        open(STDOUT,">&WTR") || &fatal("Can't redirect STDOUT to pipe");
-
         pod2html(
             "--htmlroot=$htmlRoot",
             "--header",
-#            "--podpath=" . join(':',@INC),
-            "--libpods=perlfunc:perlguts:perlvar:perlrun:perlop",
+            "--podpath=" . join(':',@INC),
+            "--libpods=VBTK",
             "--norecurse",
-            "--infile=$podFile"
+            "--infile=$podFile",
         );
 
         exit 0;
@@ -149,16 +153,6 @@ __END__
 =head1 NAME
 
 VBTK::DynPod2Html - Dynamic Generation of HTML from any POD.
-
-=head1 SUPPORTED PLATFORMS
-
-=over 4
-
-=item * 
-
-Solaris
-
-=back
 
 =head1 SYNOPSIS
 

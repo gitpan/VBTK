@@ -4,8 +4,8 @@
 #                       Any changes made without RCS will be lost
 #
 #              $Source: /usr/local/cvsroot/vbtk/VBTK/Snmp/Dynamo.pm,v $
-#            $Revision: 1.4 $
-#                $Date: 2002/02/13 08:01:57 $
+#            $Revision: 1.9 $
+#                $Date: 2002/03/04 20:53:08 $
 #              $Author: bhenry $
 #              $Locker:  $
 #               $State: Exp $
@@ -33,6 +33,21 @@
 #       REVISION HISTORY:
 #
 #       $Log: Dynamo.pm,v $
+#       Revision 1.9  2002/03/04 20:53:08  bhenry
+#       *** empty log message ***
+#
+#       Revision 1.8  2002/03/04 16:49:10  bhenry
+#       Changed requirement back to perl 5.6.0
+#
+#       Revision 1.7  2002/03/02 00:53:55  bhenry
+#       Documentation updates
+#
+#       Revision 1.6  2002/02/20 20:41:35  bhenry
+#       *** empty log message ***
+#
+#       Revision 1.5  2002/02/19 19:13:59  bhenry
+#       Changed to use inheritance
+#
 #       Revision 1.4  2002/02/13 08:01:57  bhenry
 #       *** empty log message ***
 #
@@ -48,7 +63,7 @@
 
 package VBTK::Snmp::Dynamo;
 
-use 5.6.1;
+use 5.6.0;
 use strict;
 use warnings;
 # I like using undef as a value so I'm turning off the uninitialized warnings
@@ -56,6 +71,9 @@ no warnings qw(uninitialized);
 
 use VBTK::Common;
 use VBTK::Snmp;
+
+# Inherit methods from VBTK::Snmp;
+our @ISA=qw(VBTK::Snmp);
 
 our $VERBOSE = $ENV{VERBOSE};
 
@@ -114,7 +132,7 @@ sub new
     VBTK::Snmp::addMibFiles("$::VBHOME/mib/Dynamo3Mib.mib");
 
     # Initialize an snmp object.
-    $self->{snmpObj} = new VBTK::Snmp(%{$self}) || return undef;
+    $self->SUPER::new() || return undef;
 
     # Store the defaults for later
     $self->{defaultParms} = $defaultParms;
@@ -131,7 +149,6 @@ sub new
 sub addVBObj
 {
     my $self = shift;
-    my $snmpObj = $self->{snmpObj};
     my $Host = $self->{Host};
     my $Port = $self->{Port};
     my $Interval   = $self->{Interval};
@@ -166,9 +183,9 @@ sub addVBObj
         BaselineDiffStatus  => undef,
         RrdTimeCol          => undef,
         RrdColumns          => 
-             # Pages Srvd, New Sess,   Curr Sess, Free Mem (MB),       Tot Mem (MB)  
-            [ '$delta[0]','$delta[2]','$data[3]','$data[5]/1024/1024','$data[4]/1024/1024' ],
-        RrdFilter           => '^\d+',
+             # Pages Srvd, New Sess,   Curr Sess, Free Mem,  Tot Mem  
+            [ '$delta[0]','$delta[2]','$data[3]','$data[5]','$data[4]' ],
+        RrdFilter           => undef,
         RrdMin              => undef,
         RrdMax              => undef,
         RrdXFF              => undef,
@@ -180,7 +197,7 @@ sub addVBObj
     &validateParms(\%args,$defaultRules);
 
     # Add the rule
-    my $vbObj = $snmpObj->addVBObj(%args);
+    my $vbObj = $self->SUPER::addVBObj(%args);
 
     return undef if ($vbObj eq undef);
 
@@ -204,7 +221,7 @@ sub addVBObj
     $vbObj->addGraphGroup (
         GroupNumber    => 3,
         DataSourceList => ':3,:4',
-        Labels         => 'freeMemMB,totMemMB',
+        Labels         => 'freeMem,totMem',
         Title          => "$Host:$Port dynamo",
     );
 
@@ -219,16 +236,6 @@ __END__
 =head1 NAME
 
 VBTK::Snmp::Dynamo - Monitoring of ATG Dynamo process through SNMP
-
-=head1 SUPPORTED PLATFORMS
-
-=over 4
-
-=item * 
-
-Solaris
-
-=back
 
 =head1 SYNOPSIS
 

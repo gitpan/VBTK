@@ -4,8 +4,8 @@
 #                       Any changes made without RCS will be lost
 #
 #              $Source: /usr/local/cvsroot/vbtk/VBTK/PHttpd.pm,v $
-#            $Revision: 1.9 $
-#                $Date: 2002/02/13 07:41:05 $
+#            $Revision: 1.12 $
+#                $Date: 2002/03/04 20:53:07 $
 #              $Author: bhenry $
 #              $Locker:  $
 #               $State: Exp $
@@ -32,6 +32,15 @@
 #       REVISION HISTORY:
 #
 #       $Log: PHttpd.pm,v $
+#       Revision 1.12  2002/03/04 20:53:07  bhenry
+#       *** empty log message ***
+#
+#       Revision 1.11  2002/03/04 16:49:09  bhenry
+#       Changed requirement back to perl 5.6.0
+#
+#       Revision 1.10  2002/03/02 00:53:55  bhenry
+#       Documentation updates
+#
 #       Revision 1.9  2002/02/13 07:41:05  bhenry
 #       Changed to use  instead of
 #
@@ -66,7 +75,7 @@
 
 package VBTK::PHttpd;
 
-use 5.6.1;
+use 5.6.0;
 use strict;
 use warnings;
 # I like using undef as a value so I'm turning off the uninitialized warnings
@@ -790,16 +799,6 @@ __END__
 =head1 NAME
 
 VBTK::PHttpd - Generic web server built on the HTTP::Daemon library
-
-=head1 SUPPORTED PLATFORMS
-
-=over 4
-
-=item * 
-
-Solaris
-
-=back
 
 =head1 SYNOPSIS
 

@@ -4,8 +4,8 @@
 #                       Any changes made without RCS will be lost
 #
 #              $Source: /usr/local/cvsroot/vbtk/VBTK/Pop3.pm,v $
-#            $Revision: 1.5 $
-#                $Date: 2002/02/13 07:38:51 $
+#            $Revision: 1.10 $
+#                $Date: 2002/03/04 20:53:07 $
 #              $Author: bhenry $
 #              $Locker:  $
 #               $State: Exp $
@@ -30,6 +30,21 @@
 #       REVISION HISTORY:
 #
 #       $Log: Pop3.pm,v $
+#       Revision 1.10  2002/03/04 20:53:07  bhenry
+#       *** empty log message ***
+#
+#       Revision 1.9  2002/03/04 16:49:09  bhenry
+#       Changed requirement back to perl 5.6.0
+#
+#       Revision 1.8  2002/03/02 00:53:55  bhenry
+#       Documentation updates
+#
+#       Revision 1.7  2002/02/20 19:25:18  bhenry
+#       *** empty log message ***
+#
+#       Revision 1.6  2002/02/19 19:08:38  bhenry
+#       Added 'total mailbox count' to data gathered
+#
 #       Revision 1.5  2002/02/13 07:38:51  bhenry
 #       Disabled RrdLogRecovery and removed use of @log
 #
@@ -48,7 +63,7 @@
 
 package VBTK::Pop3;
 
-use 5.6.1;
+use 5.6.0;
 use strict;
 use warnings;
 # I like using undef as a value so I'm turning off the uninitialized warnings
@@ -95,10 +110,11 @@ sub new
     }
 
     # Setup the header and detail formats for the pmobjects and log
-    my $stdHeader   = [ 'Time              Retrieval (sec) Round-trip (sec) Mail Count Error',
-                        '----------------- --------------- ---------------- ---------- -----' ];
-    my $stdDetail   = [ '@<<<<<<<<<<<<<<<< @>>>>>>>>>>>>>> @>>>>>>>>>>>>>>> @>>>>>>>>> @>>>>',
-                        '$time,            $data[0],       $data[1],        $data[2],  $data[3]' ];
+    my $stdHeader   = [ '                  Retrieval Round-trip Retrieved MailBox',
+                        'Time              (sec)     (sec)      Count     Count   Error',
+                        '----------------- --------- ---------- --------- ------- -----' ];
+    my $stdDetail   = [ '@<<<<<<<<<<<<<<<< @>>>>>>>> @>>>>>>>>> @>>>>>>>> @>>>>>> @>>>>',
+                        '$time,@data[0..4]' ];
 
     # Setup a hash of default parameters
     my $defaultParms = {
@@ -166,7 +182,7 @@ sub addVBObj
         ExpireAfter          => "$expireAfterSec seconds",
         Description          => $description,
         RrdTimeCol           => undef,
-        RrdColumns           => [ '$data[0]', '$data[1]', '$data[3]' ],
+        RrdColumns           => [ '$data[0]', '$data[1]', '$data[4]' ],
         RrdFilter            => undef,
         RrdMin               => 0,
         RrdMax               => undef,
@@ -224,7 +240,7 @@ sub run
     my $lastTime       = $self->{lastTime};
 
     my $now = time;
-    my ($sock,$elapsedTime,$pop,$roundTrip,$count,$sleepTime);
+    my ($sock,$elapsedTime,$pop,$roundTrip,$count,$sleepTime,$totMessages);
 
     # If it's not time to run yet, then return
     if(($sleepTime = $self->calcSleepTime()) > 0)
@@ -255,7 +271,7 @@ sub run
 
         # If a processFilter was specified, then look for email which
         # have a subject matching the filter, and process them.
-        ($roundTrip,$count) = $self->processEmail($pop) 
+        ($roundTrip,$count,$totMessages) = $self->processEmail($pop) 
             if (defined $RetrieveFilter);
 
         $pop->Close();
@@ -272,14 +288,14 @@ sub run
     {
         my $msg = "Error retrieving mail from '$Host:$Port' - $@";
         &error($msg);
-        $self->parseData([[$elapsedTime,0,0,1]],$ErrorStatus,$msg);
+        $self->parseData([[$elapsedTime,0,0,0,1]],$ErrorStatus,$msg);
     }
     # If the RetrieveFilter is specified, then only report a status if the
     # count is > 0.  If the RetrieveFilter is not specified, then always report it.
     elsif(($count > 0)||(! defined $RetrieveFilter))
     {
         # Call the response time parser, with the elapsed time
-        $self->parseData([[$elapsedTime,$roundTrip,$count,0]],$::SUCCESS);
+        $self->parseData([[$elapsedTime,$roundTrip,$count,$totMessages,0]],$::SUCCESS);
     }
 
     $sleepTime = $self->calcSleepTime(1);
@@ -304,7 +320,8 @@ sub processEmail
     my ($roundTrip,$count,$i,@headers,@subject,@startDateLine,@endDateLine);
     my ($startTime,$endTime,$roundTripTotal);
 
-    for($i = 1; $i <= $pop->Count(); $i++)
+    my $totMessages = $pop->Count();
+    for($i = 1; $i <= $totMessages; $i++)
     {
         @headers = $pop->Head($i);
         @subject = grep(/^Subject:\s+/i,@headers);
@@ -341,7 +358,7 @@ sub processEmail
     # Calculate the average round-trip time.
     $roundTrip = ($count > 0) ? $roundTripTotal/$count : 0;
 
-    ($roundTrip,$count);
+    ($roundTrip,$count,$totMessages);
 }
 
 # Put in a stub for handleSignal
@@ -354,16 +371,6 @@ __END__
 =head1 NAME
 
 VBTK::Tcp - Tcp Listener Monitoring
-
-=head1 SUPPORTED PLATFORMS
-
-=over 4
-
-=item * 
-
-Solaris
-
-=back
 
 =head1 SYNOPSIS
 

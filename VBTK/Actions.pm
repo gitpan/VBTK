@@ -5,8 +5,8 @@
 #                       Any changes made without RCS will be lost
 #
 #              $Source: /usr/local/cvsroot/vbtk/VBTK/Actions.pm,v $
-#            $Revision: 1.2 $
-#                $Date: 2002/01/21 17:07:40 $
+#            $Revision: 1.7 $
+#                $Date: 2002/03/04 20:53:06 $
 #              $Author: bhenry $
 #              $Locker:  $
 #               $State: Exp $
@@ -42,19 +42,25 @@
 #       REVISION HISTORY:
 #
 #       $Log: Actions.pm,v $
-#       Revision 1.2  2002/01/21 17:07:40  bhenry
-#       Disabled 'uninitialized' warnings
+#       Revision 1.7  2002/03/04 20:53:06  bhenry
+#       *** empty log message ***
 #
-#       Revision 1.1.1.1  2002/01/17 18:05:56  bhenry
-#       VBTK Project
+#       Revision 1.6  2002/03/04 16:49:08  bhenry
+#       Changed requirement back to perl 5.6.0
 #
-#       Revision 1.9  2002/01/04 10:52:40  bhenry
-#       Revision 1.8  2002/01/04 10:40:35  bhenry
-#       Improvements during vacation.
+#       Revision 1.5  2002/03/02 00:53:54  bhenry
+#       Documentation updates
+#
+#       Revision 1.4  2002/02/20 19:25:18  bhenry
+#       *** empty log message ***
+#
+#       Revision 1.3  2002/02/19 19:01:19  bhenry
+#       Rewrote Actions to make use of inheritance
+#
 
 package VBTK::Actions;
 
-use 5.6.1;
+use 5.6.0;
 use strict;
 use warnings;
 # I like using undef as a value so I'm turning off the uninitialized warnings
@@ -62,6 +68,7 @@ no warnings qw(uninitialized);
 
 use VBTK::Common;
 use Date::Manip;
+use POSIX qw(waitpid WNOHANG);
 
 our $VERSION = '0.01';
 
@@ -69,6 +76,7 @@ our %PENDING_QUEUE;
 our @LOG_ACTION_LIST;
 our %ACTION_LIST;
 our $VERBOSE=$ENV{VERBOSE};
+our $LAST_HANDLER_PID;
 
 #-------------------------------------------------------------------------------
 # Function:     new
@@ -78,19 +86,93 @@ our $VERBOSE=$ENV{VERBOSE};
 #-------------------------------------------------------------------------------
 sub new
 {
-    my $type = shift;
-    my $self = {};
-    bless $self, $type;
+    my ($type,$self);
+    
+    # If we're passed a hash, then it's probably from an inheriting class
+    if((defined $_[0])&&(UNIVERSAL::isa($_[0], 'HASH')))
+    {
+        $self = shift;
+    }
+    # Otherwise, allocate a new hash, bless it and handle any passed parms
+    else
+    {
+        $type = shift;
+        $self = {};
+        bless $self, $type;
 
-    # Store all passed input name pairs in the object
-    $self->set(@_);
+        # Set any passed parms
+        $self->set(@_);
+
+        # Setup a hash of default parameters
+        my $defaultParms = {
+            Name          => $::REQUIRED,
+            Execute       => undef,
+            SendUrl       => 1,
+            LimitToEvery  => '2 min',
+            SubActionList => undef,
+            LogActionFlag => undef,
+        };
+
+        # Validate the passed parms against the default parms.
+        $self->validateParms($defaultParms) || &fatal("Exiting");
+    }
+
+    # Convert the SubActionList to an array if it's not already one.
+    my $SubActionList = $self->{SubActionList};
+    $self->{SubActionList} = [ split(/,/,$SubActionList) ]
+        unless (ref($SubActionList));
+
+    # Create a per-action queue of pending messages
     $self->{messages} = [];
+    
+    # Calculate 'LimitToEvery' in seconds
+    $self->{limitToEverySec} = &deltaSec($self->{LimitToEvery}) ||
+        &fatal("Invalid 'LimitToEvery' setting in action '$self->{Name}'");
 
     &log("Creating new action '$self->{Name}'") if ($VERBOSE);
 
+    # Store myself in the global hash
     $ACTION_LIST{$self->{Name}} = $self;
 
     return $self;
+}
+
+#-------------------------------------------------------------------------------
+# Function:     run
+# Description:  Run the action.  Override this class when subclassing to create
+#               a different action.  Note that the triggerAll method has already
+#               forked a separate process at this point, so there's no need to
+#               worry about doing a fork here to avoid blocking the engine if the
+#               action takes a while to run.  Also, this method must return a
+#               1 or the action won't be cleared from the queue.
+# Input Parms:  None
+# Output Parms: None
+#-------------------------------------------------------------------------------
+sub run
+{
+    my $self = shift;
+    my $message = shift;
+    my $Execute = $self->{Execute};
+    
+    # If nothing was passed in for the execute, then just return.
+    return 1 unless ($Execute);
+    
+    &log("Executing '$Execute'");
+    unless(open(EXEC, "| $Execute")) 
+    { 
+        &error("Cannot exec '$Execute'"); 
+        return 0; 
+    };
+    print EXEC $message;
+    close(EXEC);
+
+    # An error code can appear in either the lower or the higher byte of $?.
+    # By or-ing the lower byte with the upper byte, we get an accurate error code.
+    my $ret_code = ($? & 0xFF) | ($? >> 8);
+
+    &log("Command exited with return code '$ret_code'.") if ($ret_code);
+
+    (1);
 }
 
 #-------------------------------------------------------------------------------
@@ -114,15 +196,16 @@ sub getAction
 #-------------------------------------------------------------------------------
 sub add_message
 {
-    my $obj = shift;
+    my $self = shift;
 
     my ($fullName,$status,$url) = @_;
-    my $SendUrl       = $obj->{SendUrl};
-    my $Execute       = $obj->{Execute};
-    my $SubActionList = $obj->{SubActionList};
-    my $Name          = $obj->{Name};
-    my $LogActionFlag = $obj->{LogActionFlag};
-    my ($message,$subAction);
+    my $SendUrl       = $self->{SendUrl};
+    my $Execute       = $self->{Execute};
+    my $SubActionList = $self->{SubActionList};
+    my $Name          = $self->{Name};
+    my $LogActionFlag = $self->{LogActionFlag};
+    my $messages      = $self->{messages};
+    my ($message,$subActionName,$subActionObj);
 
     # Forming message to be sent
     $message = "$fullName - $status";
@@ -132,24 +215,29 @@ sub add_message
     &log("Adding message '$message' to action '$Name'") if ($VERBOSE > 1);
 
     # Add the message to the queue of messages to be sent out the next time the
-    # action is triggered.  Only add the message if this action has a command
-    # to execute.
-    push(@{$obj->{messages}},$message) if ($Execute ne '');
+    # action is triggered.
+    push(@{$messages},$message);
 
     # Step through each sub-action, passing along the parameters.
-    foreach $subAction (@{$SubActionList})
+    foreach $subActionName (@{$SubActionList})
     {
-        $subAction->add_message($fullName,$status,$url);
+        # Log an error if the action name is invalid
+        unless($subActionObj = &getAction($subActionName))
+        {
+            &error("Invalid action name '$subActionName' specified");
+            next;
+        }
+        $subActionObj->add_message($fullName,$status,$url);
     }
 
     # If the LogAction parm was specified, then add it to the action log.
     if ($LogActionFlag)
     {
-        VBTK::LogActionList::add($fullName,$status,$url,$obj);
+        VBTK::LogActionList::add($fullName,$status,$url,$self);
     }
 
     # Mark this action as pending execution
-    $PENDING_QUEUE{$obj} = $obj;
+    $PENDING_QUEUE{$self} = $self;
     (0);
 }
 
@@ -161,13 +249,40 @@ sub add_message
 #-------------------------------------------------------------------------------
 sub triggerAll
 {
-    my($action,$actionKey);
+    my($actionObj,$actionKey,$pid);
+    my @pendingActions = keys %PENDING_QUEUE;
+    
+    return unless(@pendingActions > 0);
 
-    foreach $actionKey (keys %PENDING_QUEUE)
-    {
-        $action = $PENDING_QUEUE{$actionKey};
-        $action->trigger();
-    }
+#    # Make sure the previous action handler isn't still running
+#    if(($LAST_HANDLER_PID) && (waitpid($LAST_HANDLER_PID,&WNOHANG) == 0))
+#    {
+#        &error("Previous action handler is still running.  Will try again later");
+#        return 1;
+#    }
+#    
+#    # Parent process
+#    if($pid = fork)
+#    {
+#        &log("Forked off action handler - pid $pid");
+#        $LAST_HANDLER_PID = $pid;
+#    }
+#    # Child process
+#    elsif(defined $pid)
+#    {
+        &log("Checking for pending requests") if ($VERBOSE > 1);
+        foreach $actionKey (@pendingActions)
+        {
+            $actionObj = $PENDING_QUEUE{$actionKey};
+            $actionObj->trigger();
+        }
+#        exit(0);
+#    }
+#    else
+#    {
+#        &error("Can't fork action handler!  Will try again later");
+#    }
+
     (0);
 }
 
@@ -180,25 +295,24 @@ sub triggerAll
 #-------------------------------------------------------------------------------
 sub trigger
 {
-    my $obj = shift;
-    my $Name = $obj->{Name};
+    my $self = shift;
+    my $Name = $self->{Name};
 
-    &log("Checking action '$Name' for messages") if ($VERBOSE > 2);
+    &log("Checking action '$Name' for messages") if ($VERBOSE > 1);
 
     # Check for messages.  If none, then just return
-    my $message = join('',@{$obj->{messages}});
+    my $message = join('',@{$self->{messages}});
     return 0 if ($message eq '');
 
-    my $limit = $obj->{LimitToEvery};
-    my $nextAllowedOccurrence = $obj->{nextAllowedOccurrence};
-    my $Execute = $obj->{Execute};
+    my $limitToEverySec       = $self->{LimitToEverySec};
+    my $nextAllowedOccurrence = $self->{nextAllowedOccurrence};
 
     my ($pid,$ret_code,$now);
 
-    &log("Checking occurence limit") if ($VERBOSE > 1);
-    $now = &ParseDate('today');
+    &log("Checking occurence limit for action '$Name'") if ($VERBOSE > 1);
+    $now = time;
 
-    if(($nextAllowedOccurrence ne '')&&($now lt $nextAllowedOccurrence))
+    if(($nextAllowedOccurrence)&&($now < $nextAllowedOccurrence))
     {
         &log("Ignoring trigger of action '$Name'") if ($VERBOSE > 1);
         &log("Next occurrence allowed at '$nextAllowedOccurrence'")
@@ -206,29 +320,25 @@ sub trigger
         return 0;
     }
 
-    $obj->{nextAllowedOccurrence} = &DateCalc($now,$limit);
+    $self->{nextAllowedOccurrence} = $now + $limitToEverySec;
 
     &log("Triggering action '$Name'") if ($VERBOSE > 1);
 
-    &log("Executing '$Execute'");
-    open(EXEC, "| $Execute") || &error("Cannot exec '$Execute'");
-    print EXEC $message;
-    close(EXEC);
-
-    # An error code can appear in either the lower or the higher byte of $?.
-    # By or-ing the lower byte with the upper byte, we get an accurate error code.
-    $ret_code = ($? & 0xFF) | ($? >> 8);
-
-    &log("Command exited with return code '$ret_code'.") if ($ret_code);
+    # Run the trigger action.  The 'run' method must return a positive value
+    # or we won't clear out the messages queue.
+    $self->run($message) || return 0;
 
     &log("Clearing all messages out of action '$Name'") if ($VERBOSE > 1);
-    @{$obj->{messages}} = ();
+    @{$self->{messages}} = ();
 
     # Remove object from the pending queue
-    delete $PENDING_QUEUE{$obj};
+    delete $PENDING_QUEUE{$self};
 
     (0);
 }
+
+
+
 
 1;
 __END__
@@ -237,31 +347,29 @@ __END__
 
 VBTK::Actions - Action definitions used by the VBTK::Server daemon
 
-=head1 SUPPORTED PLATFORMS
-
-=over 4
-
-=item * 
-
-Solaris
-
-=back
-
 =head1 SYNOPSIS
 
+  # Action to run a script on the command line
   $t = new VBTK::Actions (
-    Name         => 'emailMe',
-    Execute      => 'mailx -s Warning me@nowhere.com',
+    Name         => 'runScript',
+    Execute      => '/usr/local/bin/myscript',
     LimitToEvery => '10 min',
-    SendUrl      => 1
- );
+    SendUrl      => 1,
+  );
+
+  # Group action, triggers other actions 
+  $s = new VBTK::Actions (
+    Name          => 'group1',
+    SubActionList => 'runScript,emailMe',
+  );
 
 =head1 DESCRIPTION
 
 The VBTK::Actions class is used to define actions to be taken by the 
-L<VBTK::Server|VBTK::Server> daemon.  At the moment, it just executes a 
-command line command, but eventually there will be additional abilities, such
-as sending email directly to an SMTP server, etc.
+L<VBTK::Server|VBTK::Server> daemon.  It can be used to Execute commands on 
+the command line or to create a grouping of sub-actions.   To add new action
+types, just sub-class off this class, overriding the 'run' method.  See the
+L<VBTK::Actions::Email|VBTK::Actions::Email> class for an example of this.
 
 =head1 METHODS
 
@@ -278,28 +386,57 @@ The allows parameters are:
 =item Name
 
 A unique string identifying this action.  This still will be used in lists
-of 'StatusChangeActions' passed to a L<VBTK::Server|VBTK::Server> daemon
+of 'StatusChangeActions' passed to the L<VBTK::Server|VBTK::Server> daemon.
+See L<VBTK::Server/item_StatusChangeActions> and
+L<VBTK::Parser/item_StatusChangeActions> for details on where you'll be 
+specifying these names.
+
+    Name => 'runScript',
 
 =item Execute
 
-A string to be executed on the command line when the action is triggered. 
-For example:
+A string to be executed on the command line when the action is triggered.
+A message will be passed in to the script on STDIN containing details about
+which objects caused the action to be triggered.
 
-    Execute => 'mailx -s Warning me@nowhere.com'
+    Execute => '/usr/local/bin/myscript'
 
 =item LimitToEvery
 
 A time expression used to limit the number of times the action can be
 triggered within a window of time.  The expression will be evaluated by the
 L<Date::Manip|Date::Manip> class, so it can be just about any recognizable
-time or date expression.  For example: '10 min' or '1 day'.
+time or date expression.  For example: '10 min' or '1 day'.  (Defaults to
+'2 min').
+
+    LimitToEvery => '2 min',
 
 =item SendUrl
 
-A boolean setting to indicate whether a URL should be passed to STDIN of
-the command line which will provide a way for the user to jump right to
-the offending object.  You would usually enable this (1) for email 
-notifications, but disable it (0) for pager notifications.
+A boolean value (0 or 1) indicating whether a one-click URL should be passed in
+the action message which will allow the user to jump directly to the object
+history entry which caused the action to be triggered.  Typically you would
+always leave this on, unless you're sending messages to a pager or some 
+other device where you wanted to keep the messages as short as possible.
+
+    SendUrl => 1,
+
+=item SubActionList
+
+A string containing a comma-separated list of action names which should be 
+triggered whenever this action is triggered.  This allows the creation of 
+action groups which both send email, and also trigger other actions. 
+
+    SubActionList => 'emailBob,pageDave,killPete',
+
+=item LogActionFlag
+
+A boolean value (0 or 1) indicating whether triggering this action should 
+cause an entry to be added to the system action log.  (Not yet implemented).
+
+    LogActionFlag => 0,
+
+=back
 
 =back
 
@@ -312,11 +449,11 @@ of VBTK::Actions objects.
 
 =item L<VBTK::Actions::Email|VBTK::Actions::Email>
 
-Defaults for sending an email as an action.
+Sending an email as an action.
 
-=item L<VBTK::Actions::Page|VBTK::Actions::Page>
+=item L<VBTK::Actions::Email::Page|VBTK::Actions::Email::Page>
 
-Defaults for sending an email to a pager as an action
+Sending an email to a pager as an action
 
 =back
 
@@ -332,7 +469,9 @@ to documenting this better.
 
 =item L<VBTK::Parser|VBTK::Parser>
 
-=item L<VBTK::Templates|VBTK::Templates>
+=item L<VBTK::Actions::Email|VBTK::Actions::Email>
+
+=item L<VBTK::Actions::Email::Page|VBTK::Actions::Email::Page>
 
 =back
 

@@ -4,8 +4,8 @@
 #                       Any changes made without RCS will be lost
 #
 #              $Source: /usr/local/cvsroot/vbtk/VBTK/Wrapper/Ping.pm,v $
-#            $Revision: 1.7 $
-#                $Date: 2002/02/13 07:36:14 $
+#            $Revision: 1.10 $
+#                $Date: 2002/03/04 20:53:08 $
 #              $Author: bhenry $
 #              $Locker:  $
 #               $State: Exp $
@@ -33,6 +33,15 @@
 #       REVISION HISTORY:
 #
 #       $Log: Ping.pm,v $
+#       Revision 1.10  2002/03/04 20:53:08  bhenry
+#       *** empty log message ***
+#
+#       Revision 1.9  2002/03/04 16:49:10  bhenry
+#       Changed requirement back to perl 5.6.0
+#
+#       Revision 1.8  2002/03/02 00:53:56  bhenry
+#       Documentation updates
+#
 #       Revision 1.7  2002/02/13 07:36:14  bhenry
 #       Disabled RrdLogRecovery and removed use of @log
 #
@@ -40,7 +49,7 @@
 
 package VBTK::Wrapper::Ping;
 
-use 5.6.1;
+use 5.6.0;
 use strict;
 use warnings;
 # I like using undef as a value so I'm turning off the uninitialized warnings
@@ -241,16 +250,6 @@ __END__
 
 VBTK::Wrapper::Ping - System monitoring with 'ping'
 
-=head1 SUPPORTED PLATFORMS
-
-=over 4
-
-=item * 
-
-Solaris
-
-=back
-
 =head1 SYNOPSIS
 
   $obj = new VBTK::Wrapper::Ping( Host => 'myhost1');
@@ -274,19 +273,20 @@ The following methods are supported
 
 =over 4
 
-=item $o = new VBTK::Wrapper::Vmstat (<parm1> => <val1>, <parm2> => <val2>, ...)
+=item $o = new VBTK::Wrapper::Ping (<parm1> => <val1>, <parm2> => <val2>, ...)
 
 This method calls 'new L<VBTK::Wrapper|VBTK::Wrapper>' after defaulting
 the parameters to run and monitor the 'ping' command.  For a detailed description
 of the parameters, see L<VBTK::Wrapper>.  Only 1 parameter 'Host' is required.
 The rest are defaulted appropriately, but if you don't like the defaults, you
-can override their settings.
+can override their settings.  The defaults are as follows:
 
 =over 4
 
-=item Required
+=item Host
 
-This is the one parameter which must be specified!  (Required)
+Hostname you want to ping.  This is the one parameter which must be specified!
+(Required)
 
     Host => 'myhost1'
 
@@ -300,8 +300,14 @@ Defaults to run the 'ping' command with the parameters listed below.  You may ne
 to specify this instead, if your 'ping' is in a different location, or uses different
 parameters.
 
-    # Run the ping command once with a 56 bytes block size
-    Execute => '/usr/sbin/ping -s <Host> 56 1',
+    # On Windows or Cygwin
+    Execute => "ping -n 1 <Host>",
+
+    # On Linux
+    Execute => "ping -c 1 <Host>",
+
+    # All others
+    Execute => "ping -s <Host> 56 1",
 
 =item PreProcessor
 
@@ -310,14 +316,16 @@ the output of the 'ping' command, picking out the response time and packet
 loss values, and then replaces the whole array of output with a single row
 of host, ip, response-time, and packet loss.
 
-    PreProcessor => sub {
+    PreProcessor = sub { 
         my($data) = @_;
         my($respTime,$pktLoss,$host,$ip,$msg) = (0,100);
         foreach (@{$data}) {
             if(/bytes from (\S+) \(([\d\.]+)\): icmp_seq=\d+.+time=(\d+)/) { 
                 ($host,$ip,$respTime) = ($1,$2,$3); next; }
-            if (/(\d+)\% packet loss/)    { $pktLoss = $1; next; }
-            if (/PING|^\s*$|^round-trip/) { next; }
+            if(/Pinging (\S+) \[([\d\.]+)\]/) { ($host,$ip) = ($1,$2); next; }
+            if(/Average =\s+(\d+)ms/)         { ($respTime) = ($1); next; }
+            if(/(\d+)\% (packet )?loss/)      { $pktLoss = $1; next; }
+            if(/PING|^\s*$|^round-trip|Approximate|statistics|Reply from/) { next; }
         }
         # Now replace everything in the $data array with a single line
         @{$data} = ([ $host, $ip, $respTime, $pktLoss ]);

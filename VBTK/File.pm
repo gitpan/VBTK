@@ -5,8 +5,8 @@
 #                       Any changes made without RCS will be lost
 #
 #              $Source: /usr/local/cvsroot/vbtk/VBTK/File.pm,v $
-#            $Revision: 1.7 $
-#                $Date: 2002/02/13 07:41:43 $
+#            $Revision: 1.12 $
+#                $Date: 2002/03/04 20:53:06 $
 #              $Author: bhenry $
 #              $Locker:  $
 #               $State: Exp $
@@ -32,6 +32,21 @@
 #       REVISION HISTORY:
 #
 #       $Log: File.pm,v $
+#       Revision 1.12  2002/03/04 20:53:06  bhenry
+#       *** empty log message ***
+#
+#       Revision 1.11  2002/03/04 16:49:09  bhenry
+#       Changed requirement back to perl 5.6.0
+#
+#       Revision 1.10  2002/03/02 00:53:54  bhenry
+#       Documentation updates
+#
+#       Revision 1.9  2002/02/20 19:25:18  bhenry
+#       *** empty log message ***
+#
+#       Revision 1.8  2002/02/19 19:06:44  bhenry
+#       *** empty log message ***
+#
 #       Revision 1.7  2002/02/13 07:41:43  bhenry
 #       *** empty log message ***
 #
@@ -50,7 +65,7 @@ require 5.004;
 
 package VBTK::File;
 
-use 5.6.1;
+use 5.6.0;
 use strict;
 use warnings;
 # I like using undef as a value so I'm turning off the uninitialized warnings
@@ -79,7 +94,7 @@ sub new
 
     my ($fileName) = @_;
 
-    log("Setting up FileCache object for '$fileName'") if ($VERBOSE > 1);
+    log("Setting up FileCache object for '$fileName'") if ($VERBOSE > 3);
 
     # Store the file name    
     $self->setFileName($fileName);
@@ -304,7 +319,7 @@ sub put
 
     my $suffix=$$;
     my ($tmpFile);
-
+    
     # Come up with a non-existant tempfile name
     do { $tmpFile = "$dirName/.tmp$baseName." . $suffix++; } while (-f $tmpFile);
 
@@ -314,7 +329,7 @@ sub put
     my $fh = new FileHandle "> $tmpFile";
 
     # Check for errors
-    unless (defined $fh)
+    unless ($fh)
     {
         &error("Can't write to file '$tmpFile'");
         return undef;
@@ -576,16 +591,6 @@ __END__
 =head1 NAME
 
 VBTK::File - Internal module of VBTK
-
-=head1 SUPPORTED PLATFORMS
-
-=over 4
-
-=item * 
-
-Solaris
-
-=back
 
 =head1 SYNOPSIS
 

@@ -4,8 +4,8 @@
 #                       Any changes made without RCS will be lost
 #
 #              $Source: /usr/local/cvsroot/vbtk/VBTK/Parser.pm,v $
-#            $Revision: 1.5 $
-#                $Date: 2002/02/13 07:40:12 $
+#            $Revision: 1.9 $
+#                $Date: 2002/03/04 20:53:07 $
 #              $Author: bhenry $
 #              $Locker:  $
 #               $State: Exp $
@@ -36,6 +36,19 @@
 #       REVISION HISTORY:
 #
 #       $Log: Parser.pm,v $
+#       Revision 1.9  2002/03/04 20:53:07  bhenry
+#       *** empty log message ***
+#
+#       Revision 1.8  2002/03/04 16:49:09  bhenry
+#       Changed requirement back to perl 5.6.0
+#
+#       Revision 1.7  2002/03/02 00:53:55  bhenry
+#       Documentation updates
+#
+#       Revision 1.6  2002/02/19 19:07:56  bhenry
+#       Changed 'lastTime' counter to 'lastRunTime' in calcSleepTime method, to
+#       avoid conflict with another 'lastTime' counter recently added.
+#
 #       Revision 1.5  2002/02/13 07:40:12  bhenry
 #       Disabled RrdLogRecovery and removed use of @log
 #
@@ -43,7 +56,7 @@
 
 package VBTK::Parser;
 
-use 5.6.1;
+use 5.6.0;
 use strict;
 use warnings;
 # I like using undef as a value so I'm turning off the uninitialized warnings
@@ -287,9 +300,9 @@ sub addVBObj
 
     # Do validations related to graphing
     &fatal("VBTK::Parser::addVBObj: Can't use Rrd/Graphing functionality without " .
-           "specifying 'LogDetail' for '$VBObjName'")
+           "specifying 'VBDetail' for '$VBObjName'")
         if((($args{RrdColumns} ne '')||($args{RrdTimeCol} ne ''))&&
-           ($self->{LogDetail} eq ''));
+           ($self->{VBDetail} eq ''));
 
     # Now create a corresponding VBTK::ClientObject
     my $vbObj = new VBTK::ClientObject (
@@ -804,21 +817,29 @@ sub calcSleepTime
     my $self = shift;
     my $incBy = shift;
     my $Interval = $self->{Interval};
-    
+    my $now = time;
+
     if($incBy > 0)
     {
         # Increment 'lastTime' accordingly.  If this is the first time it's being
         # set, then add a random factor to the lastTime, so that the objects 
         # don't all report in at the same time.
-        if(! defined $self->{lastTime}) {
-            $self->{lastTime} = time + int((rand() - 0.5) * ($Interval * $incBy));
+        if(! defined $self->{lastRunTime}) {
+            $self->{lastRunTime} = $now + int((rand() - 0.5) * ($Interval * $incBy));
         } else  {  
-            $self->{lastTime} += ($Interval * $incBy); 
+            $self->{lastRunTime} += ($Interval * $incBy); 
+
+            # If we get more than 3 Intervals behind, then start skipping to
+            # catch up.
+            while($self->{lastRunTime} < ($now - ($Interval * 3)))
+            {
+                $self->{lastRunTime} += $Interval;
+            }
         }
     }
 
     # Calculate how many seconds until it needs to be run again.
-    my $sleepTime = ($self->{lastTime} + $Interval) - time;
+    my $sleepTime = ($self->{lastRunTime} + $Interval) - $now;
     $sleepTime = 0 if ($sleepTime < 0);
 
     ($sleepTime);
@@ -833,16 +854,6 @@ __END__
 =head1 NAME
 
 VBTK::Parser - Class for handling parsing and processing of incoming data
-
-=head1 SUPPORTED PLATFORMS
-
-=over 4
-
-=item * 
-
-Solaris
-
-=back
 
 =head1 SYNOPSIS
 

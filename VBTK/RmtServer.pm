@@ -5,8 +5,8 @@
 #                       Any changes made without RCS will be lost
 #
 #              $Source: /usr/local/cvsroot/vbtk/VBTK/RmtServer.pm,v $
-#            $Revision: 1.3 $
-#                $Date: 2002/02/13 07:39:44 $
+#            $Revision: 1.8 $
+#                $Date: 2002/03/04 20:53:07 $
 #              $Author: bhenry $
 #              $Locker:  $
 #               $State: Exp $
@@ -39,6 +39,21 @@
 #       REVISION HISTORY:
 #
 #       $Log: RmtServer.pm,v $
+#       Revision 1.8  2002/03/04 20:53:07  bhenry
+#       *** empty log message ***
+#
+#       Revision 1.7  2002/03/04 16:49:09  bhenry
+#       Changed requirement back to perl 5.6.0
+#
+#       Revision 1.6  2002/03/02 00:53:55  bhenry
+#       Documentation updates
+#
+#       Revision 1.5  2002/02/20 19:25:18  bhenry
+#       *** empty log message ***
+#
+#       Revision 1.4  2002/02/19 19:09:06  bhenry
+#       Added getCount method
+#
 #       Revision 1.3  2002/02/13 07:39:44  bhenry
 #       Disabled RrdLogRecovery and removed use of @log
 #
@@ -51,7 +66,7 @@
 
 package VBTK::RmtServer;
 
-use 5.6.1;
+use 5.6.0;
 use strict;
 use warnings;
 
@@ -230,23 +245,24 @@ sub sendAllHeartbeats
     ($result);
 }
 
+#-------------------------------------------------------------------------------
+# Function:     getCount
+# Description:  Return the total number of configured Remote Servers
+# Input Parms:  None
+# Output Parms: Number of Remote Servers
+#-------------------------------------------------------------------------------
+sub getCount
+{
+    scalar(@RMTSERVERLIST);
+}
+
+
 1;
 __END__
 
 =head1 NAME
 
-VBTK::RmtServer - Remote server class used by the L<VBTK::Server|VBTK::Server>
-daemon
-
-=head1 SUPPORTED PLATFORMS
-
-=over 4
-
-=item * 
-
-Solaris
-
-=back
+VBTK::RmtServer - Remote server class used by the VBTK::Server daemon
 
 =head1 SYNOPSIS
 
@@ -276,7 +292,11 @@ heartbeat and exchange information.  Do not call this class directly.
 
 =head1 SEE ALSO
 
-VBTK::Server
+=over 4
+
+=item L<VBTK::Server|VBTK::Server>
+
+=back
 
 =head1 AUTHOR
 

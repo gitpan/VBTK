@@ -4,8 +4,8 @@
 #                       Any changes made without RCS will be lost
 #
 #              $Source: /usr/local/cvsroot/vbtk/VBTK/Wrapper/DiskFree.pm,v $
-#            $Revision: 1.7 $
-#                $Date: 2002/02/13 08:01:57 $
+#            $Revision: 1.10 $
+#                $Date: 2002/03/04 20:53:08 $
 #              $Author: bhenry $
 #              $Locker:  $
 #               $State: Exp $
@@ -33,6 +33,15 @@
 #       REVISION HISTORY:
 #
 #       $Log: DiskFree.pm,v $
+#       Revision 1.10  2002/03/04 20:53:08  bhenry
+#       *** empty log message ***
+#
+#       Revision 1.9  2002/03/04 16:49:10  bhenry
+#       Changed requirement back to perl 5.6.0
+#
+#       Revision 1.8  2002/03/02 00:53:56  bhenry
+#       Documentation updates
+#
 #       Revision 1.7  2002/02/13 08:01:57  bhenry
 #       *** empty log message ***
 #
@@ -42,7 +51,7 @@
 
 package VBTK::Wrapper::DiskFree;
 
-use 5.6.1;
+use 5.6.0;
 use strict;
 use warnings;
 # I like using undef as a value so I'm turning off the uninitialized warnings
@@ -252,16 +261,6 @@ __END__
 =head1 NAME
 
 VBTK::Wrapper::DiskFree - Sun hardware disk space monitoring with 'df'
-
-=head1 SUPPORTED PLATFORMS
-
-=over 4
-
-=item * 
-
-Solaris
-
-=back
 
 =head1 SYNOPSIS
 

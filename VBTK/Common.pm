@@ -4,8 +4,8 @@
 #                       Any changes made without RCS will be lost
 #
 #              $Source: /usr/local/cvsroot/vbtk/VBTK/Common.pm,v $
-#            $Revision: 1.10 $
-#                $Date: 2002/02/13 07:38:15 $
+#            $Revision: 1.14 $
+#                $Date: 2002/03/04 20:53:06 $
 #              $Author: bhenry $
 #              $Locker:  $
 #               $State: Exp $
@@ -36,6 +36,18 @@
 #       REVISION HISTORY:
 #
 #       $Log: Common.pm,v $
+#       Revision 1.14  2002/03/04 20:53:06  bhenry
+#       *** empty log message ***
+#
+#       Revision 1.13  2002/03/04 16:49:09  bhenry
+#       Changed requirement back to perl 5.6.0
+#
+#       Revision 1.12  2002/03/02 00:53:54  bhenry
+#       Documentation updates
+#
+#       Revision 1.11  2002/02/19 19:06:14  bhenry
+#       Added deltaSec function
+#
 #       Revision 1.10  2002/02/13 07:38:15  bhenry
 #       Moved write_pid_file functionality from Common into Controller
 #
@@ -64,7 +76,7 @@
 # These first variables need to be in the main package
 package main;
 
-use 5.6.1;
+use 5.6.0;
 use strict;
 use warnings;
 # I like using undef as a value so I'm turning off these warnings
@@ -146,7 +158,7 @@ our $HOST = hostname();
 # Enter the common package
 package VBTK::Common;
 
-use Date::Manip qw();
+use Date::Manip qw(ParseDateDelta Delta_Format);
 use POSIX;
 
 # Export all the common methods
@@ -158,7 +170,7 @@ our @ISA = qw(Exporter);
 our @EXPORT = qw(log error fatal map_status find_higher_status
                  datestamp color_by_status testFork testAlarm
                  red green yellow blue bold log_datestamp validateParms set
-                 unixdate);
+                 unixdate deltaSec);
 
 # Setup global package variables
 our $PID_SET = 0;
@@ -413,6 +425,40 @@ sub log_datestamp
 }
 
 #-------------------------------------------------------------------------------
+# Function:     deltaSec
+# Description:  Evaluate the passed string and return the number of seconds it
+#               represents.
+# Input Parms:  String
+# Output Parms: Seconds
+#-------------------------------------------------------------------------------
+sub deltaSec
+{
+    my ($str) = @_;
+    
+    my $delta    = &ParseDateDelta($str) || return undef;
+    my $deltaSec = &Delta_Format($delta,0,'%st') || return undef;
+
+    int($deltaSec);
+}
+
+#-------------------------------------------------------------------------------
+# Function:     gmtdatestamp
+# Description:  Return the current datestamp in YYYYMMDDHH:MM:SS format.  This
+#               is used by internal functions to generate Date::Manip compatible
+#       timestamps.  Do not change the format!!
+# Input Parms:  None
+# Output Parms: Datestamp
+#-------------------------------------------------------------------------------
+sub gmtdatestamp
+{
+    my $time = shift || time;
+    my($sec,$min,$hour,$mday,$mon,$year) = gmtime($time);
+    $year += 1900;
+    ++$mon;
+    sprintf "%04d%02d%02d%02d:%02d:%02d",$year,$mon,$mday,$hour,$min,$sec;
+}
+
+#-------------------------------------------------------------------------------
 # Function:     datestamp
 # Description:  Return the current datestamp in YYYYMMDDHH:MM:SS format.  This
 #               is used by internal functions to generate Date::Manip compatible
@@ -422,7 +468,8 @@ sub log_datestamp
 #-------------------------------------------------------------------------------
 sub datestamp
 {
-    my($sec,$min,$hour,$mday,$mon,$year) = localtime(time);
+    my $time = shift || time;
+    my($sec,$min,$hour,$mday,$mon,$year) = localtime($time);
     $year += 1900;
     ++$mon;
     sprintf "%04d%02d%02d%02d:%02d:%02d",$year,$mon,$mday,$hour,$min,$sec;
@@ -511,16 +558,6 @@ __END__
 =head1 NAME
 
 VBTK::Common - Internal module of VBTK
-
-=head1 SUPPORTED PLATFORMS
-
-=over 4
-
-=item * 
-
-Solaris
-
-=back
 
 =head1 SYNOPSIS
 

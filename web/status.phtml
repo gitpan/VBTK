@@ -33,7 +33,7 @@
     $header        = $histObj->getHeaderMsg;
     $footer        = $histObj->getFooterMsg;
     $timestamp     = $histObj->getTimestamp;
-    $timestampText = &Date::Manip::UnixDate($timestamp, "%C");
+    $timestampText = &Date::Manip::UnixDate("epoch $timestamp", "%C");
     $statusColor   = $STATUS_FGCOLOR{$status};
 
     # If the setBaseline parm was passed, then try to save this history object

@@ -5,8 +5,8 @@
 #                       Any changes made without RCS will be lost
 #
 #              $Source: /usr/local/cvsroot/vbtk/VBTK/AdminLog.pm,v $
-#            $Revision: 1.2 $
-#                $Date: 2002/01/28 18:13:19 $
+#            $Revision: 1.5 $
+#                $Date: 2002/03/04 20:53:06 $
 #              $Author: bhenry $
 #              $Locker:  $
 #               $State: Exp $
@@ -32,6 +32,15 @@
 #       REVISION HISTORY:
 #
 #       $Log: AdminLog.pm,v $
+#       Revision 1.5  2002/03/04 20:53:06  bhenry
+#       *** empty log message ***
+#
+#       Revision 1.4  2002/03/04 16:49:08  bhenry
+#       Changed requirement back to perl 5.6.0
+#
+#       Revision 1.3  2002/03/02 00:53:54  bhenry
+#       Documentation updates
+#
 #       Revision 1.2  2002/01/28 18:13:19  bhenry
 #       *** empty log message ***
 #
@@ -42,7 +51,7 @@
 
 package VBTK::AdminLog;
 
-use 5.6.1;
+use 5.6.0;
 use strict;
 use warnings;
 # I like using undef as a value so I'm turning off the uninitialized warnings
@@ -185,16 +194,6 @@ __END__
 =head1 NAME
 
 VBTK::AdminLog - Internal module of VBTK
-
-=head1 SUPPORTED PLATFORMS
-
-=over 4
-
-=item * 
-
-Solaris
-
-=back
 
 =head1 SYNOPSIS
 

@@ -1,50 +1,50 @@
 #!/bin/perl
 #
 # Example script for using VBTK::Server.  This will be your most complicated
-# script, but just follow the comments and it should make sense.
+# script, but just follow the comments and it should make sense.  See the
+# VBTK::Server pod documentation for more details - 'perldoc VBTK::Server'
 
 use VBTK::Server;
 
 # Set some host-specific defaults.  This allows us to use the same script
 # on both vbserver machines and just vary the things which need to be different.
-#
-# The prefix is a string which will be appended as the first segment of all
-# object names reported to the VBServer which start with '.'.  
-
-my ($prefix,$remoteURI);
+my ($prefix,$remoteURI,$mailHost);
 if($HOST eq 'sfoServer') {
-    ($prefix,$remoteURI) = ('sfo',"http://nycServer:$VBPORT");
+    $prefix    = 'sfo';                      # String to prepend to object names
+    $remoteURI = "http://nycServer:$VBPORT"; # URI of remote slave/master server
+    $mailHost  = 'sfosmtp';                  # SMTP host to send alerts through
 } elsif ($HOST eq 'nycServer') {
-    ($prefix,$remoteURI) = ('nyc',"http://sfoServer:$VBPORT");
+    $prefix    = 'nyc';                      # String to prepend to object names
+    $remoteURI = "http://sfoServer:$VBPORT"; # URI of remote slave/master server
+    $mailHost  = 'nycsmtp';                  # SMTP host to send alerts through
 } else {
     die("Not supposed to run vbserver on this machine");
 };
 
-# Setup email and paging actions for your sysadmins
-new VBTK::Actions::Email (
-    Name  => 'emailSA',
-    Email => 'sa1@mydomain.com,sa2@mydomain.com' );
+# Setup email actions
+new VBTK::Actions::Email ( Name => 'emailMe',  To => 'me@mydomain.com' );
+new VBTK::Actions::Email ( Name => 'emailBob', To => 'bob@mydomain.com' );
 
-#new VBTK::Actions::Page (
-#    Name  => 'pageSA',
-#    Email => 'page.sa1@mydomain.com,page.sa2@mydomain.com' );
+# Setup paging actions
+new VBTK::Actions::Email::Page ( Name => 'pageMe',  To => 'page.me@mydomain.com');
+new VBTK::Actions::Email::Page ( Name => 'pageBob', To => 'page.bob@mydomain.com');
 
-#new VBTK::Actions::Email (
-#    Name  => 'emailDBA',
-#    Email => 'dba1@mydomain.com,dba2@mydomain.com' );
-
-#new VBTK::Actions::Page (
-#    Name  => 'pageDBA',
-#    Email => 'page.dba1@mydomain.com,page.dba2@mydomain.com' );
+# Setup some action groups
+new VBTK::Actions ( Name => 'emailSA', SubActionList => 'emailMe,emailBob' );
+new VBTK::Actions ( Name => 'pageSA',  SubActionList => 'pageMe,pageBob,emailSA' );
 
 # Initialize a server object.
 $server = new VBTK::Server (
      ObjectPrefix	  => $prefix,
-     HousekeepingInterval => 60 );
+     SmtpHost             => $mailHost,
+     EmailFrom            => 'vbtk@settomydomain.com',
+     CompanyName          => 'My Company',
+     AdminEmail           => 'sysop@settomydomain.com',
+);
 
-# Setup heartbeat connections to the other VB server    
-$server->addRemoteServer (
-    RemoteURI  => $remoteURI );
+# Setup heartbeat connections to another VB server    
+#$server->addRemoteServer (
+#    RemoteURI  => $remoteURI );
     
 # Create templates to match up status change actions with objects
 
@@ -60,8 +60,9 @@ $server->addRemoteServer (
 #$server->addTemplate (
 #    Pattern 		=> 'nyc.*http|mainserver.*ping',
 #    StatusChangeActions => { 
-#        Failed  => 'emailSA',
-#        Expired => 'emailSA' } );
+#        Failed  => 'pageSA',
+#        Expired => 'pageSA',
+#        Warning => 'emailSA' } );
 
 # Everything else, just email
 $server->addTemplate (

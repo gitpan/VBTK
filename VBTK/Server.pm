@@ -5,8 +5,8 @@
 #                       Any changes made without RCS will be lost
 #
 #              $Source: /usr/local/cvsroot/vbtk/VBTK/Server.pm,v $
-#            $Revision: 1.7 $
-#                $Date: 2002/02/13 07:39:28 $
+#            $Revision: 1.10 $
+#                $Date: 2002/03/02 00:53:55 $
 #              $Author: bhenry $
 #              $Locker:  $
 #               $State: Exp $
@@ -31,6 +31,15 @@
 #       REVISION HISTORY:
 #
 #       $Log: Server.pm,v $
+#       Revision 1.10  2002/03/02 00:53:55  bhenry
+#       Documentation updates
+#
+#       Revision 1.9  2002/02/20 19:25:18  bhenry
+#       *** empty log message ***
+#
+#       Revision 1.8  2002/02/19 19:10:15  bhenry
+#       Added ability to pass email-related parms in constructor
+#
 #       Revision 1.7  2002/02/13 07:39:28  bhenry
 #       Moved write_pid_file functionality from Common into Controller
 #
@@ -50,7 +59,7 @@ no warnings qw(uninitialized);
 use VBTK::Common;
 use VBTK::Actions;
 use VBTK::Actions::Email;
-use VBTK::Actions::Page;
+use VBTK::Actions::Email::Page;
 use VBTK::Templates;
 use VBTK::Objects;
 use VBTK::Client;
@@ -70,6 +79,9 @@ our $VERBOSE=$ENV{'VERBOSE'};
 our @CHILD_PIDS;
 our $SIGNAL_CAUGHT;
 our $CURR_SERVER;
+
+# Make sure Date::Manip knows the timezone
+&VBTK::Common::checkDateManipTZ();
 
 #-------------------------------------------------------------------------------
 # Function:     new
@@ -93,6 +105,10 @@ sub new
         DocRoot              => "$::VBHOME/web",
         ObjectPrefix         => 'local',
         ExternalURL          => "$::VBURI/status.phtml",
+        SmtpHost             => 'localhost',
+        EmailFrom            => 'vbtk@settomydomain.com',
+        CompanyName          => undef,
+        AdminEmail           => undef,
         Redirects            => undef,
         IndexNames           => 'index.html,index.htm,index.phtml,matrix.phtml',
         HousekeepingInterval => 60,
@@ -146,9 +162,13 @@ sub new
         DefaultPrefix => $self->{ObjectPrefix},
         ForkRrdUpdate => $self->{ForkRrdUpdate},
     );
+ 
+    # Setup some global values for the Sendmail module
+    $Mail::Sendmail::mailcfg{smtp} = [ $self->{SmtpHost} ] if ($self->{SmtpHost});
+    $Mail::Sendmail::mailcfg{from} = $self->{EmailFrom} if ($self->{EmailFrom});
     
-    # Make sure Date::Manip knows the timezone
-    &VBTK::Common::checkDateManipTZ();
+    # Setup an array to store a list of remote servers to show locally.
+    $self->{showRemoteServerMatrixList} = [];
 
     return $self;
 }
@@ -165,14 +185,23 @@ sub addRemoteServer
     my $LocalPort = $self->{LocalPort};
     my $LocalAddr = $self->{LocalAddr};
     my $Interval  = $self->{HousekeepingInterval};
+    my $showRemoteServerMatrixList = $self->{showRemoteServerMatrixList};
     my $localURI = ($LocalAddr) ? "http://$LocalAddr:$LocalPort" :
         "http://$::HOST:$LocalPort";
+        
+    my %args = @_;
+
+    # If the 'ShowMatrixLocally' parm was specified, then add the server URI to
+    # the list of matrices to show on the local instance.
+    push(@{$showRemoteServerMatrixList},$args{RemoteURI}) 
+        unless ($args{DontShowMatrix});
+    delete $args{DontShowMatrix};
 
     # Pass along the passed parameters to the RmtServer class        
     my $rmtServer = new VBTK::RmtServer(
         LocalURI => $localURI,
         Interval => $Interval,
-        @_
+        %args,
     );
 
     (0);
@@ -440,6 +469,11 @@ sub forkHeartbeat
     my $self = shift;
     my $Interval    = $self->{HousekeepingInterval};
 
+    # See how many remote servers were configured and if none, then don't
+    # fork the heartbeat process.
+    my $RemoteServerCount = &VBTK::RmtServer::getCount();
+    return unless ($RemoteServerCount > 0);
+
     my($pid,$nextHeartbeat,$sleepTime);
 
     # Parent process
@@ -514,22 +548,18 @@ sub catchSignal
     }
 }
 
+# Simple Get Methods
+sub getCompanyName { my $self = shift || $CURR_SERVER; $self->{CompanyName}; }
+sub getAdminEmail  { my $self = shift || $CURR_SERVER; $self->{AdminEmail}; }
+sub getShowRemoteServerMatrixList { 
+    my $self = shift || $CURR_SERVER; @{$self->{showRemoteServerMatrixList}} };
+
 1;
 __END__
 
 =head1 NAME
 
 VBTK::Server - Main server process for the VBTK toolkit
-
-=head1 SUPPORTED PLATFORMS
-
-=over 4
-
-=item * 
-
-Solaris
-
-=back
 
 =head1 SYNOPSIS
 
@@ -538,47 +568,62 @@ configuration would look something like this:
 
   use VBTK::Server
   use VBTK::Actions::Email
-  use VBTK::Actions::Page
+  use VBTK::Actions::Email::Page
 
-  # Create main server object  
-  $server = new VBTK::Server(
-    ObjectPrefix   => 'home1' );
+  # Setup email actions
+  new VBTK::Actions::Email ( Name => 'emailMe',  To => 'me@mydomain.com' );
+  new VBTK::Actions::Email ( Name => 'emailBob', To => 'bob@mydomain.com' );
+
+  # Setup paging actions
+  new VBTK::Actions::Email::Page ( Name => 'pageMe',  To => 'page.me@mydomain.com');
+  new VBTK::Actions::Email::Page ( Name => 'pageBob', To => 'page.bob@mydomain.com');
+
+  # Setup some action groups
+  new VBTK::Actions ( Name => 'emailSA', SubActionList => 'emailMe,emailBob' );
+  new VBTK::Actions ( Name => 'pageSA',  SubActionList => 'pageMe,pageBob,emailSA' );
+
+  # Initialize a server object.
+  $server = new VBTK::Server (
+    ObjectPrefix => 'sfo',
+    SmtpHost     => 'mysmtphost',
+    MailFrom     => 'vbtk@settomydomain.com',
+    CompanyName  => 'My Company',
+    AdminEmail   => 'sysop@settomydomain.com',
+  );
 
   # Point to another VB server with which we will exchange heartbeats
   # and relay requests
   $server->addRemoteServer(
     RemoteURI      => 'http://myotherserver:4712' );
 
-  # Declare some actions
-  new VBTK::Actions::Email(
-    Name  => 'emailMe',
-    Email => 'me@nowhere.com' );
+  # Create templates to match up status change actions with objects
 
-  new VBTK::Actions::Page(
-    Name  => 'pageMe',
-    Email => 'page.me@nowhere.com' );
+  # Critical objects, page and email
+  $server->addTemplate (
+    Pattern        => 'nyc.*http|mainserver.*ping',
+    StatusChangeActions => { 
+      Failed  => 'pageSA',
+      Expired => 'pageSA',
+      Warning => 'emailSA' } );
 
-  # Create a template    
-  $server->addTemplate(
-    Pattern             => '.*',
-    ExpireAfter         => '1 day',
-    StatusHistoryLimit  => 20,
-    StatusChangeActions => {
-      Failed  => 'pageMe,emailMe' ,
-      Warning => 'emailMe' },
-    Description         => qq( Default template ) 
-  );
+  # Everything else, just email
+  $server->addTemplate (
+    Pattern         => '.*',
+    StatusChangeActions => { 
+      Failed  => 'emailSA',
+      Expired => 'emailSA',
+      Warning => 'emailSA' } );
 
-  # Startup the server - never returns
+  # Start the server listening and handling requests.
   $server->run;
 
 =head1 DESCRIPTION
 
 VBTK::Server is the central process for the VBTK toolkit.  It is used to define
-and start a vbserver daemon which gathers together, evaluates, and displays 
-all the statuses, test data, and graphs of the various test programs.  It uses 
-the L<HTTP::Daemon> module to provide an HTTP/1.1 server which is the access 
-point for client processes to submit data and for users to view data.
+and start a vbserver daemon which gathers together, evaluates, and displays all
+the statuses, test data, and graphs of the various test programs.  It uses the
+L<HTTP::Daemon|HTTP::Daemon> module to provide an HTTP/1.1 server which is the
+access point for client processes to submit data and for users to view data.
 
 The server process makes use of the L<VBTK::PHttpd|VBTK::PHttpd> and 
 L<VBTK::PHtml|VBTK::PHtml> modules.
@@ -603,7 +648,7 @@ the daemon, but does not start it listening yet.  The allowed parameters are:
 
 The TCP port number on which the VBServer will start it's web server listening for
 requests.  See L<VBTK::PHttpd>.  Defaults to the environment variable 
-L<VBPORT|VBTK/item_VBPORT> as explained in the L<VBTK|VBTK> manpage.
+$VBPORT as explained in the L<VBTK|VBTK> manpage.
 
 =item LocalAddr
 
@@ -638,6 +683,24 @@ form the URL which allows one-click access to the object.  (Defaults to
 Number of seconds between housekeeping runs.  Housekeeping includes executing
 pending actions, checking object expiration times, etc.  (Defaults to 60)
 
+=item SmtpHost
+
+A string containing the hostname or IP to direct email to when triggering actions.
+This value is passed directly to the Mail::Sendmail package.
+
+=item EmailFrom
+
+A string used as the 'From' address when triggering actions which send email.
+
+=item CompanyName
+
+A string which will be shown in the web interface as the company name.
+
+=item AdminEmail
+
+A string containing an email address which will be shown in the footer of 
+each page of the web interface as the vbtk admin.
+
 =item UseWatchDog
 
 A boolean (0 or 1) indicating whether to use a watchdog process to start the
@@ -668,6 +731,13 @@ transmission on the local server.   (Defaults to '.<hostname>.hrtbt')
 
 The URI of the remote VB server.  (ie: 'http://remoteserver:4712')  (Required)
 
+=item DontShowMatrix
+
+A boolean value (0 or 1) indicating whether the matrix from this remote server
+should be pulled and shown with the local server's matrix.  A value of 1 means
+that it will not be shown.  This is nice for pulling together all the statuses
+from all your slave servers into a single web page.  (Defaults to 0)
+
 =back
 
 =item $s->addTemplate(<parm1> => <val1>, <parm2> => <val2>, ...)
@@ -676,7 +746,7 @@ Templates are used to assign properties to VB objects based on patterns.  This
 allows the assignment of expiration periods, status change actions, etc., based
 on how the objects are named.  Template settings are
 only used if the corresponding values were not specified directly in the 
-object definition itself.  The allowed paramters are:
+client-side object definition itself.  The allowed paramters are:
 
 =over 4
 
@@ -687,6 +757,8 @@ a VBTK::Server object name.  New objects are compared to each pattern
 sequentially, in the order that the templates were added.  Once a match is 
 found, the object will inherit the template settings.  
 
+    Pattern => '.*http.*',
+
 =item ExpireAfter
 
 A string containing a date or time expression used to indicate how long
@@ -695,11 +767,15 @@ the server should allow the object to be idle before changing the status to
 library for evaluation, so you can put in almost any recognizable date or
 time expression.  (ie: 1 day, 3 weeks, etc.)
 
+    ExpireAfter => '10 min',
+
 =item StatusHistoryLimit
 
 A number indicating how many status change events to maintain in the history
 for this object.  You can view history entries under the 'History' tab in the
 VBTK::Server web interface.
+
+    StatusHistoryLimit => '20',
 
 =item StatusChangeActions
 
@@ -723,7 +799,7 @@ Upgrade to <newStatus> if <testStatus> occurs <count> times in <time expression>
 
 For example:
 
-    StatusUpgradeRules = [
+    StatusUpgradeRules => [
       'Upgrade to Failed if Warning occurs 2 times in 6 min' ]
 
 =item Description
@@ -731,12 +807,17 @@ For example:
 A text description which will be displayed for this object under the 'Info'
 tab in the VBTK::Server web interface.
 
+    Description => qw( This object monitors the web server ),
+
 =back
 
-=item $s->run
+=item $s->run(<returnAfter>)
 
-This method starts up the server process.  It never returns.  Call it as the
-very last step in setting up your server.
+This method starts up the server process.  It will handle requests to the web
+interface for <returnAfter> seconds or forever if no <returnAfter> is
+specified.  Don't specify a <returnAfter> value unless you have your own outer
+loop you need to run through periodically.  Call it as the very last step in
+setting up your server.
 
 =back
 
@@ -759,15 +840,13 @@ make changes as needed.
 
 =item L<VBTK::Controller|VBTK::Controller>
 
-=item L<VBTK::RmtServer|VBTK::RmtServer>
-
-=item L<VBTK::Templates|VBTK::Templates>
-
-=item L<HTTP::Daemon|HTTP::Daemon>
-
 =item L<VBTK::PHttpd|VBTK::PHttpd>
 
 =item L<VBTK::PHtml|VBTK::PHtml>
+
+=item L<HTTP::Daemon|HTTP::Daemon>
+
+=item L<Mail::Sendmail|Mail::Sendmail>
 
 =back
 

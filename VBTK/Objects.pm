@@ -48,6 +48,18 @@
 #       REVISION HISTORY:
 #
 #       $Log: Objects.pm,v $
+#       Revision 1.10  2002/03/04 20:53:07  bhenry
+#       *** empty log message ***
+#
+#       Revision 1.9  2002/03/04 16:49:09  bhenry
+#       Changed requirement back to perl 5.6.0
+#
+#       Revision 1.8  2002/03/02 00:53:55  bhenry
+#       Documentation updates
+#
+#       Revision 1.7  2002/02/19 19:03:58  bhenry
+#       Changed to accept 'SetBaselineFlag' when setting status
+#
 #       Revision 1.6  2002/01/28 22:28:45  bhenry
 #       *** empty log message ***
 #
@@ -70,7 +82,7 @@
 
 package VBTK::Objects;
 
-use 5.6.1;
+use 5.6.0;
 use strict;
 use warnings;
 # I like using undef as a value so I'm turning off the uninitialized warnings
@@ -231,12 +243,13 @@ sub setStatus
         ScriptName          => undef,
         LogFile             => undef,
         Interval            => undef,
+        SetBaselineFlag     => undef,
     };
 
     # Validate the passed paramters
     &validateParms(\%args,$defaultParms) || return $ERROR;
 
-    my $time = &datestamp();
+    my $time = time;
     my $newStatus = &map_status($args{Status});
     my $name = $args{Name};
 
@@ -363,10 +376,7 @@ sub recurseSetStatus
 
         # Construct the file path for the history file.  Remove any ':' in the 
         # file name.
-        $histFileName = $time;
-        $histFileName =~ s/:/-/g;
-        
-        $self->{histFile}  = $histFileName;
+        $self->{histFile} = $histFileName = $time;
 
         # Unload other passed parms into the object, if any of these parms are
         # specified, then we need to re-write the metadata file so mark a flag.
@@ -421,6 +431,9 @@ sub recurseSetStatus
 
         # Store any passed parameters which need to be persistent
         $self->storeMetaData if ($metaDataChangedFlg);
+        
+        # Store the baseline, if the setBaselineFlag was passed
+        $self->{baselineFileObj}->put($text) if ($args{SetBaselineFlag});
 
         # If the status didn't change, then return NO_CHANGE, skipping all the
         # work of checking for status change actions.
@@ -587,15 +600,14 @@ sub updateExpirTime
 
     my $ExpireAfter = $self->{ExpireAfter} || $template->getExpireAfter;
 
-    my $newExpireTimestamp;
-
     # If no expiration was specified, then just return
     return 0 if (! defined $ExpireAfter);
 
     &log("Current timestamp is '$Timestamp'") if ($VERBOSE > 2);
 
     # Use the Date::Manip perl library to calculate the new expiration datetime.
-    $newExpireTimestamp = &DateCalc($Timestamp,$ExpireAfter);
+    my $expireAfterSec = &deltaSec($ExpireAfter) || return 0;
+    my $newExpireTimestamp = $Timestamp + $expireAfterSec;
     &log("Used '$ExpireAfter' to set new expir to '$newExpireTimestamp'")
         if ($VERBOSE > 2);
 
@@ -625,7 +637,7 @@ sub checkForExpiration
 
     my ($ptr,$childObj,$childObjName,$result,$recalcGroupFlg);
 
-    $now = &datestamp() unless ($now);
+    $now = time unless ($now);
 
     # Groups don't have an expiration time, so just recurse down.
     if((defined $type)&&($type eq 'group'))
@@ -678,7 +690,7 @@ sub checkForExpiration
         {
             &log("Checking expiration date of '$name' - $expireTime")
                 if(($VERBOSE > 1)&&($expireTime));
-            if(($expireTime)&&($now gt $expireTime)&&($status ne $::EXPIRED))
+            if(($expireTime)&&($now > $expireTime)&&($status ne $::EXPIRED))
             {
                 $self->recurseSetStatus(
                     Name    => $name,
@@ -902,7 +914,6 @@ sub checkForStatusChangeAction
     my $self = shift;
     my $status    = $self->{Status};
     my $name      = $self->{Name};
-    my $timestamp = $self->{Timestamp};
     my $histFile  = $self->{histFile};
     my $ChangeActionObjList = $self->getChangeActionObjList($status);
 
@@ -980,7 +991,7 @@ sub cleanHistory
         $template->{StatusHistoryLimit};
 
     my $hLen = @{$h};
-    my ($startHistory,$timestamp);
+    my ($startHistory,$timestamp,$historyLimitSec);
 
     &log("Cleaning history") if ($VERBOSE > 1);
 
@@ -1020,13 +1031,14 @@ sub cleanHistory
     # starting cutoff.
     else
     {
-        $startHistory = &DateCalc("today","- $StatusHistoryLimit");
+        $historyLimitSec = &deltaSec($StatusHistoryLimit);
+        $startHistory = time - $historyLimitSec;
         $timestamp = $h->[$hLen - 1]->getTimestamp;
 
         &log("Searching for history timestamps prior to '$startHistory'")
            if ($VERBOSE > 2);
 
-        while($timestamp lt $startHistory)
+        while($timestamp < $startHistory)
         {
             &log("Removing history entry for $timestamp") if ($VERBOSE > 2);
             $self->deleteHistoryItem($hLen - 1);
@@ -1405,10 +1417,10 @@ sub getFullName            { $_[0]->{Name}; }
 sub getHistFile            { $_[0]->{histFile}; }
 sub getSegName             { $_[0]->{SegmentName}; }
 sub getTimestamp           { $_[0]->{Timestamp}; }
-sub getTimestampText       { ($_[0]->{Timestamp}) ? &UnixDate($_[0]->{Timestamp},"%C") : "None"; }
+sub getTimestampText       { ($_[0]->{Timestamp}) ? &UnixDate("epoch $_[0]->{Timestamp}","%C") : "None"; }
 sub getStatus              { $_[0]->{Status}; }
 sub getExpiration          { $_[0]->{expireTime}; }
-sub getExpirationText      { ($_[0]->{expireTime}) ? &UnixDate($_[0]->{expireTime},"%C") : "None"; }
+sub getExpirationText      { ($_[0]->{expireTime}) ? &UnixDate("epoch $_[0]->{expireTime}","%C") : "None"; }
 sub getNameSegments        { split(/\./,$_[0]->{Name}); }
 sub getGrandChildNames     { sort keys %{$_[0]->{grandchildObjectNames}}; }
 sub getGrandChildCount     { (keys %{$_[0]->{grandchildObjectNames}}) + 0; }
@@ -1475,16 +1487,6 @@ __END__
 =head1 NAME
 
 VBTK::Objects - Internal module of VBTK
-
-=head1 SUPPORTED PLATFORMS
-
-=over 4
-
-=item * 
-
-Solaris
-
-=back
 
 =head1 SYNOPSIS
 

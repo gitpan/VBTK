@@ -4,8 +4,8 @@
 #                       Any changes made without RCS will be lost
 #
 #              $Source: /usr/local/cvsroot/vbtk/VBTK/Log.pm,v $
-#            $Revision: 1.4 $
-#                $Date: 2002/02/13 07:38:52 $
+#            $Revision: 1.7 $
+#                $Date: 2002/03/04 20:53:07 $
 #              $Author: bhenry $
 #              $Locker:  $
 #               $State: Exp $
@@ -33,6 +33,15 @@
 #       REVISION HISTORY:
 #
 #       $Log: Log.pm,v $
+#       Revision 1.7  2002/03/04 20:53:07  bhenry
+#       *** empty log message ***
+#
+#       Revision 1.6  2002/03/04 16:49:09  bhenry
+#       Changed requirement back to perl 5.6.0
+#
+#       Revision 1.5  2002/03/02 00:53:54  bhenry
+#       Documentation updates
+#
 #       Revision 1.4  2002/02/13 07:38:52  bhenry
 #       Disabled RrdLogRecovery and removed use of @log
 #
@@ -42,7 +51,7 @@
 
 package VBTK::Log;
 
-use 5.6.1;
+use 5.6.0;
 use strict;
 use warnings;
 # I like using undef as a value so I'm turning off the uninitialized warnings
@@ -171,16 +180,6 @@ __END__
 =head1 NAME
 
 VBTK::Log - Monitoring of sequential ASCII text logs
-
-=head1 SUPPORTED PLATFORMS
-
-=over 4
-
-=item * 
-
-Solaris
-
-=back
 
 =head1 SYNOPSIS
 

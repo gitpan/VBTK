@@ -4,8 +4,8 @@
 #                       Any changes made without RCS will be lost
 #
 #              $Source: /usr/local/cvsroot/vbtk/VBTK/DBI/OraLogins.pm,v $
-#            $Revision: 1.5 $
-#                $Date: 2002/02/13 07:36:27 $
+#            $Revision: 1.8 $
+#                $Date: 2002/03/04 20:53:07 $
 #              $Author: bhenry $
 #              $Locker:  $
 #               $State: Exp $
@@ -33,6 +33,15 @@
 #       REVISION HISTORY:
 #
 #       $Log: OraLogins.pm,v $
+#       Revision 1.8  2002/03/04 20:53:07  bhenry
+#       *** empty log message ***
+#
+#       Revision 1.7  2002/03/04 16:49:10  bhenry
+#       Changed requirement back to perl 5.6.0
+#
+#       Revision 1.6  2002/03/02 00:53:55  bhenry
+#       Documentation updates
+#
 #       Revision 1.5  2002/02/13 07:36:27  bhenry
 #       Disabled RrdLogRecovery and removed use of @log
 #
@@ -50,7 +59,7 @@
 
 package VBTK::DBI::OraLogins;
 
-use 5.6.1;
+use 5.6.0;
 use strict;
 use warnings;
 # I like using undef as a value so I'm turning off the uninitialized warnings
@@ -224,16 +233,6 @@ __END__
 =head1 NAME
 
 VBTK::DBI::OraLogins - Monitoring of connections and blocking processes in Oracle
-
-=head1 SUPPORTED PLATFORMS
-
-=over 4
-
-=item * 
-
-Solaris
-
-=back
 
 =head1 SYNOPSIS
 

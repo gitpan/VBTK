@@ -4,7 +4,7 @@ MANIFEST
 README
 VBTK.pm
 VBTK/Actions/Email.pm
-VBTK/Actions/Page.pm
+VBTK/Actions/Email/Page.pm
 VBTK/Actions.pm
 VBTK/AdminLog.pm
 VBTK/Client.pm
@@ -87,6 +87,7 @@ web/setBaselineRaw.phtml
 web/setStatusRaw.phtml
 web/status.phtml
 t/general.t
+t/server.t
 etc/rc3.d/S90vbtk
 bin/installStartupLinks
 bin/removeStartupLinks

@@ -4,8 +4,8 @@
 #                       Any changes made without RCS will be lost
 #
 #              $Source: /usr/local/cvsroot/vbtk/VBTK/Objects/Rrd.pm,v $
-#            $Revision: 1.4 $
-#                $Date: 2002/02/08 02:14:21 $
+#            $Revision: 1.7 $
+#                $Date: 2002/03/04 20:53:07 $
 #              $Author: bhenry $
 #              $Locker:  $
 #               $State: Exp $
@@ -37,6 +37,15 @@
 #       REVISION HISTORY:
 #
 #       $Log: Rrd.pm,v $
+#       Revision 1.7  2002/03/04 20:53:07  bhenry
+#       *** empty log message ***
+#
+#       Revision 1.6  2002/03/04 16:49:10  bhenry
+#       Changed requirement back to perl 5.6.0
+#
+#       Revision 1.5  2002/03/02 00:53:55  bhenry
+#       Documentation updates
+#
 #       Revision 1.4  2002/02/08 02:14:21  bhenry
 #       *** empty log message ***
 #
@@ -53,7 +62,7 @@
 
 package VBTK::Rrd;
 
-use 5.6.1;
+use 5.6.0;
 use strict;
 use warnings;
 # I like using undef as a value so I'm turning off the uninitialized warnings
@@ -561,16 +570,6 @@ __END__
 =head1 NAME
 
 VBTK::Objects::Rrd - Internal module of VBTK
-
-=head1 SUPPORTED PLATFORMS
-
-=over 4
-
-=item * 
-
-Solaris
-
-=back
 
 =head1 SYNOPSIS
 

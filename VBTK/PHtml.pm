@@ -4,8 +4,8 @@
 #                       Any changes made without RCS will be lost
 #
 #              $Source: /usr/local/cvsroot/vbtk/VBTK/PHtml.pm,v $
-#            $Revision: 1.4 $
-#                $Date: 2002/01/23 19:16:48 $
+#            $Revision: 1.7 $
+#                $Date: 2002/03/04 20:53:07 $
 #              $Author: bhenry $
 #              $Locker:  $
 #               $State: Exp $
@@ -36,6 +36,15 @@
 #       REVISION HISTORY:
 #
 #       $Log: PHtml.pm,v $
+#       Revision 1.7  2002/03/04 20:53:07  bhenry
+#       *** empty log message ***
+#
+#       Revision 1.6  2002/03/04 16:49:09  bhenry
+#       Changed requirement back to perl 5.6.0
+#
+#       Revision 1.5  2002/03/02 00:53:55  bhenry
+#       Documentation updates
+#
 #       Revision 1.4  2002/01/23 19:16:48  bhenry
 #       Improved handling of passed parms
 #
@@ -51,7 +60,7 @@
 
 package VBTK::PHtml;
 
-use 5.6.1;
+use 5.6.0;
 use strict;
 use warnings;
 # I like using undef as a value so I'm turning off the uninitialized warnings
@@ -390,16 +399,6 @@ __END__
 =head1 NAME
 
 VBTK::PHtml - Internal module of VBTK
-
-=head1 SUPPORTED PLATFORMS
-
-=over 4
-
-=item * 
-
-Solaris
-
-=back
 
 =head1 SYNOPSIS
 

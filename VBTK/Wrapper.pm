@@ -4,8 +4,8 @@
 #                       Any changes made without RCS will be lost
 #
 #              $Source: /usr/local/cvsroot/vbtk/VBTK/Wrapper.pm,v $
-#            $Revision: 1.5 $
-#                $Date: 2002/02/13 07:38:51 $
+#            $Revision: 1.9 $
+#                $Date: 2002/03/04 20:53:07 $
 #              $Author: bhenry $
 #              $Locker:  $
 #               $State: Exp $
@@ -41,6 +41,18 @@
 #       REVISION HISTORY:
 #
 #       $Log: Wrapper.pm,v $
+#       Revision 1.9  2002/03/04 20:53:07  bhenry
+#       *** empty log message ***
+#
+#       Revision 1.8  2002/03/04 16:49:09  bhenry
+#       Changed requirement back to perl 5.6.0
+#
+#       Revision 1.7  2002/03/02 00:53:55  bhenry
+#       Documentation updates
+#
+#       Revision 1.6  2002/02/19 19:12:06  bhenry
+#       Changed to use unix time internally, to avoid DST problems
+#
 #       Revision 1.5  2002/02/13 07:38:51  bhenry
 #       Disabled RrdLogRecovery and removed use of @log
 #
@@ -56,7 +68,7 @@
 
 package VBTK::Wrapper;
 
-use 5.6.1;
+use 5.6.0;
 use strict;
 use warnings;
 # I like using undef as a value so I'm turning off the uninitialized warnings
@@ -322,7 +334,6 @@ sub openCmd
     my $cmd_open = $self->{cmd_open};
     my $run_count = $self->{run_count};
     my $Follow = $self->{Follow};
-    my $lastTime = $self->{lastTime};
     my $header = $self->{DebugHeader};
     my $out = $self->{out};
     my $now = time;
@@ -529,16 +540,6 @@ __END__
 
 VBTK::Wrapper - Command line encapsulation and monitoring.
 
-=head1 SUPPORTED PLATFORMS
-
-=over 4
-
-=item * 
-
-Solaris
-
-=back
-
 =head1 SYNOPSIS
 
   $t = new VBTK::Wrapper (
@@ -686,7 +687,10 @@ parm.
 
 A number indicating how many lines to skip at the start of the incoming data.
 For example, the first 3 lines of the 'vmstat' command output should be
-discarded.
+discarded.  A negative value will skip to the end of the first batch of 
+incoming data, so for example a value of '-3' would ignore all but the last
+3 rows of the first batch of data.  This is useful when tailing a log file
+where you only want to look at new data being added to the log file.
 
     Skiplines => 3,
 
@@ -740,7 +744,7 @@ The following variables will be set just before these detail lines are evaluated
 
 =item $time
 
-A datestamp of the form YYYYMMDD-HH:MM:SS
+The current datestamp in the form YYYYMMDD-HH:MM:SS
 
 =item $data
 
@@ -758,6 +762,11 @@ previous @data.  In multi-row output, the row number is used to match up
 multiple @data arrays with their previous @data values to calulate the deltas.
 These deltas are most useful when monitoring the change in counters.  This is
 very common in SNMP monitors.
+
+=item @rate
+
+An array containing the same data as in the @delta array, but divided by the
+number of seconds since the last data retrieval.
 
 =back
 
@@ -883,8 +892,31 @@ their descriptions.
 
 =head1 SEE ALSO
 
-VBTK::Wrapper::
-VBTK::ClientObject
+=over 4
+
+=item L<VBTK::Parser|VBTK::Parser>
+
+=item L<VBTK::ClientObject|VBTK::ClientObject>
+
+=item L<VBTK::Server|VBTK::Server>
+
+=item L<VBTK|VBTK>
+
+=item L<VBTK::Wrapper::Ping|VBTK::Wrapper::Ping>
+
+=item L<VBTK::Wrapper::DiskFree|VBTK::Wrapper::DiskFree>
+
+=item L<VBTK::Wrapper::Vmstat|VBTK::Wrapper::Vmstat>
+
+=item L<VBTK::Wrapper::PrtDiag|VBTK::Wrapper::PrtDiag>
+
+=item L<VBTK::Wrapper::Metastat|VBTK::Wrapper::Metastat>
+
+=item L<VBTK::Wrapper::Vxprint|VBTK::Wrapper::Vxprint>
+
+=item L<VBTK::Wrapper::Log|VBTK::Wrapper::Log>
+
+=back
 
 =head1 AUTHOR
 

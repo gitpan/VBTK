@@ -5,8 +5,8 @@
 #                       Any changes made without RCS will be lost
 #
 #              $Source: /usr/local/cvsroot/vbtk/VBTK/Objects/UpgradeRules.pm,v $
-#            $Revision: 1.2 $
-#                $Date: 2002/01/21 17:07:50 $
+#            $Revision: 1.6 $
+#                $Date: 2002/03/04 20:53:07 $
 #              $Author: bhenry $
 #              $Locker:  $
 #               $State: Exp $
@@ -31,6 +31,18 @@
 #       REVISION HISTORY:
 #
 #       $Log: UpgradeRules.pm,v $
+#       Revision 1.6  2002/03/04 20:53:07  bhenry
+#       *** empty log message ***
+#
+#       Revision 1.5  2002/03/04 16:49:10  bhenry
+#       Changed requirement back to perl 5.6.0
+#
+#       Revision 1.4  2002/03/02 00:53:55  bhenry
+#       Documentation updates
+#
+#       Revision 1.3  2002/02/19 19:12:36  bhenry
+#       Changed to use unix time internally, to avoid DST problems
+#
 #       Revision 1.2  2002/01/21 17:07:50  bhenry
 #       Disabled 'uninitialized' warnings
 #
@@ -40,7 +52,7 @@
 
 package VBTK::Objects::UpgradeRules;
 
-use 5.6.1;
+use 5.6.0;
 use strict;
 use warnings;
 # I like using undef as a value so I'm turning off the uninitialized warnings
@@ -133,12 +145,12 @@ sub checkForUpgrade
     my $TimeWindow = $self->{TimeWindow};
     my $NewStatus  = $self->{NewStatus};
 
-    my $startTimestamp = &DateCalc("today","- $TimeWindow");
-    my $startTimestampSec = &unixdate($startTimestamp);
+    my $timeWindowSec = &deltaSec($TimeWindow) || return $status;
+    my $startTimestampSec = time - $timeWindowSec;
 
     my $count = 0;
 
-    &log("Looking for $Occurs $TestStatus" . "'s since $startTimestamp")
+    &log("Looking for $Occurs $TestStatus" . "'s since $startTimestampSec")
         if ($VERBOSE > 2);
 
     my($itemStatus,$itemTimestamp,$itemRepeat,$itemRawStatus,$itemRepeatStart);
@@ -155,7 +167,7 @@ sub checkForUpgrade
 
         # We're done if the history entry is earlier than the start of the
         # time window.
-        last if ($itemTimestamp le $startTimestamp);
+        last if ($itemTimestamp < $startTimestampSec);
         &log("History entry $itemTimestamp, $itemRawStatus repeated $itemRepeat times")
             if ($VERBOSE > 3);
 
@@ -164,18 +176,15 @@ sub checkForUpgrade
         # the rule.
         if ($itemRawStatus eq $TestStatus)
         {
-            $itemRepeatStartSec = &unixdate($itemRepeatStart);
-            $itemTimestampSec = &unixdate($itemTimestamp);
-
-            if($itemRepeatStartSec > $startTimestampSec)
+            if($itemRepeatStart > $startTimestampSec)
             {
                 $count += $itemRepeat;
                 &log("Adding $itemRepeat to $TestStatus count") if ($VERBOSE > 3);
             }
             else
             {
-                $ratio = (($itemTimestampSec - $startTimestampSec) /
-                          ($itemTimestampSec - $itemRepeatStartSec ));
+                $ratio = (($itemTimestamp - $startTimestampSec) /
+                          ($itemTimestamp - $itemRepeatStart ));
                 $inRangeCount = int(($itemRepeat * $ratio) + 1);
                 $count += $inRangeCount;
                 &log("Adding $inRangeCount of $itemRepeat to $TestStatus count")
@@ -188,7 +197,7 @@ sub checkForUpgrade
     return $status if($count < $Occurs);
 
     # If we made it this far, then it's time to upgrade the status
-    &log("$TestStatus occurred $count times since $startTimestamp, " .
+    &log("$TestStatus occurred $count times since $startTimestampSec, " .
          "Upgrading status to '$NewStatus'") if ($VERBOSE > 2);
 
     # Add a header message to the most recent history object
@@ -224,16 +233,6 @@ __END__
 =head1 NAME
 
 VBTK::Objects::UpgradeRules - Internal module of VBTK
-
-=head1 SUPPORTED PLATFORMS
-
-=over 4
-
-=item * 
-
-Solaris
-
-=back
 
 =head1 SYNOPSIS
 

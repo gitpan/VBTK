@@ -4,8 +4,8 @@
 #                       Any changes made without RCS will be lost
 #
 #              $Source: /usr/local/cvsroot/vbtk/VBTK/ClientObject.pm,v $
-#            $Revision: 1.7 $
-#                $Date: 2002/02/13 07:41:35 $
+#            $Revision: 1.11 $
+#                $Date: 2002/03/04 20:53:06 $
 #              $Author: bhenry $
 #              $Locker:  $
 #               $State: Exp $
@@ -31,6 +31,18 @@
 #       REVISION HISTORY:
 #
 #       $Log: ClientObject.pm,v $
+#       Revision 1.11  2002/03/04 20:53:06  bhenry
+#       *** empty log message ***
+#
+#       Revision 1.10  2002/03/04 16:49:09  bhenry
+#       Changed requirement back to perl 5.6.0
+#
+#       Revision 1.9  2002/03/02 00:53:54  bhenry
+#       Documentation updates
+#
+#       Revision 1.8  2002/02/19 19:05:33  bhenry
+#       Changed to pass baseline with first status submission if not already set
+#
 #       Revision 1.7  2002/02/13 07:41:35  bhenry
 #       Disabled RrdLogRecovery and removed use of @log
 #
@@ -38,7 +50,7 @@
 
 package VBTK::ClientObject;
 
-use 5.6.1;
+use 5.6.0;
 use strict;
 use warnings;
 # I like using undef as a value so I'm turning off the uninitialized warnings
@@ -411,6 +423,11 @@ sub processGraphData
     my $graphDataQueue       = $self->{graphDataQueue};
     my $lastGraphDbTimestamp = $self->{lastGraphDbTimestamp};
 
+    # Just return if there's nothing in @data, or if RrdColumns or RrdTimeCol
+    # isn't setup right.
+    return 0 if (! defined $data[0] || ! defined $RrdTimeCol || 
+                 ! defined $RrdColumns || @{$RrdColumns} < 1);
+
     my ($expr,$val,@exprVals,@vals,$timeValUnix,$timeValStr,$newEntry);
     my ($flag,$cmd);
 
@@ -425,10 +442,6 @@ sub processGraphData
         return 1 if $flag;
     }
 
-    # Just return if there's nothing in @data, or if RrdColumns or RrdTimeCol
-    # isn't setup right.
-    return 0 if (! defined $data[0] || ! defined $RrdTimeCol || 
-                 ! defined $RrdColumns || @{$RrdColumns} < 1);
 
     # Step through each of the column expressions, evaluating them and storing
     # their resulting values.
@@ -644,6 +657,14 @@ sub sendStatus
         GraphStruct => $graphStruct,
         @oneTimeParms
     };
+    
+    # If the 'setBaselineFlag' was set, then pass it along to the server and
+    # then reset it.
+    if($self->{setBaselineFlag})
+    {
+        $objStruct->{SetBaselineFlag} = 1;
+        $self->{setBaselineFlag} = undef;
+    }
 
     &log("Setting status of '$VBObjName' to '$status'") if ($VERBOSE > 1); 
     $retval = $VBClientObj->setStatus(objStruct => &freeze($objStruct));
@@ -725,16 +746,14 @@ sub checkBaseline
     # If we don't get anything back from the baseline request, then try to set
     # it once.  If we can't set it, or if we've already tried this before, then
     # just report the error.
-    if (! defined $baselineText)
+    if (! $baselineText)
     {
         if(! $self->{baselineSetOnce})
         {
-            &log("Setting baseline for $VBObjName");
+            &log("Marking flag to set baseline for $VBObjName");
+            $self->{setBaselineFlag} = 1;
             $self->{baselineSetOnce} = 1;
-
-            # If we're able to set it successfully, then just return
-            return 0 if $VBClientObj->setBaseline(name => $VBObjName,
-                                                  text => $messageText);
+            return 0;
         }
 
         $self->{statusLine} .= "Error: Cannot compare baseline because it cannot " .
@@ -774,16 +793,6 @@ __END__
 =head1 NAME
 
 VBTK::ClientObject - Class for handling client-side processing of VBObjects.
-
-=head1 SUPPORTED PLATFORMS
-
-=over 4
-
-=item * 
-
-Solaris
-
-=back
 
 =head1 SYNOPSIS
 

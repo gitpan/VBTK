@@ -5,8 +5,8 @@
 #                       Any changes made without RCS will be lost
 #
 #              $Source: /usr/local/cvsroot/vbtk/VBTK/Templates.pm,v $
-#            $Revision: 1.2 $
-#                $Date: 2002/01/21 17:07:40 $
+#            $Revision: 1.5 $
+#                $Date: 2002/03/04 20:53:07 $
 #              $Author: bhenry $
 #              $Locker:  $
 #               $State: Exp $
@@ -44,6 +44,15 @@
 #       REVISION HISTORY:
 #
 #       $Log: Templates.pm,v $
+#       Revision 1.5  2002/03/04 20:53:07  bhenry
+#       *** empty log message ***
+#
+#       Revision 1.4  2002/03/04 16:49:09  bhenry
+#       Changed requirement back to perl 5.6.0
+#
+#       Revision 1.3  2002/03/02 00:53:55  bhenry
+#       Documentation updates
+#
 #       Revision 1.2  2002/01/21 17:07:40  bhenry
 #       Disabled 'uninitialized' warnings
 #
@@ -54,7 +63,7 @@
 
 package VBTK::Templates;
 
-use 5.6.1;
+use 5.6.0;
 use strict;
 use warnings;
 # I like using undef as a value so I'm turning off the uninitialized warnings
@@ -203,16 +212,6 @@ __END__
 
 VBTK::Templates - Template definitions used by the L<VBTK::Server|VBTK::Server>
 daemon
-
-=head1 SUPPORTED PLATFORMS
-
-=over 4
-
-=item * 
-
-Solaris
-
-=back
 
 =head1 SYNOPSIS
 

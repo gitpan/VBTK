@@ -5,8 +5,8 @@
 #                       Any changes made without RCS will be lost
 #
 #              $Source: /usr/local/cvsroot/vbtk/VBTK.pm,v $
-#            $Revision: 1.20 $
-#                $Date: 2002/02/13 08:01:13 $
+#            $Revision: 1.29 $
+#                $Date: 2002/03/04 20:54:25 $
 #              $Author: bhenry $
 #              $Locker:  $
 #               $State: Exp $
@@ -32,20 +32,26 @@
 #       REVISION HISTORY:
 #
 #       $Log: VBTK.pm,v $
-#       Revision 1.20  2002/02/13 08:01:13  bhenry
+#       Revision 1.29  2002/03/04 20:54:25  bhenry
 #       *** empty log message ***
 #
-#       Revision 1.19  2002/02/13 07:42:31  bhenry
+#       Revision 1.28  2002/03/04 20:53:06  bhenry
 #       *** empty log message ***
 #
-#       Revision 1.17  2002/02/08 02:16:56  bhenry
+#       Revision 1.27  2002/03/04 16:49:08  bhenry
+#       Changed requirement back to perl 5.6.0
+#
+#       Revision 1.26  2002/03/04 16:46:38  bhenry
 #       *** empty log message ***
+#
+#       Revision 1.25  2002/03/02 01:01:22  bhenry
+#       Documentation Updates
 #
 #
 
 package VBTK;
 
-use 5.6.1;
+use 5.6.0;
 use strict;
 use warnings;
 # I like using undef as a value so I'm turning off the uninitialized warnings
@@ -59,7 +65,7 @@ use File::Find;
 use VBTK::Controller;
 
 # Setup things to be exported
-our $VERSION = '0.14';
+our $VERSION = '0.20';
 
 our @ALL_VBTK_OBJECTS = ();
 our $SIGNAL_CAUGHT = '';
@@ -152,7 +158,7 @@ sub runAll
         }
 
         # Otherwise, just sleep until we need to run again
-        &log("Sleeping for $lowestSleepTime") if ($VERBOSE > 2);
+        &log("Sleeping for $lowestSleepTime") if ($VERBOSE > 1);
         $lowestSleepTime = $minSleepTime if ($lowestSleepTime < $minSleepTime);
         sleep $lowestSleepTime if ($lowestSleepTime > 0);
     }
@@ -324,13 +330,13 @@ sub install
         exit 1;
     }
     
-    # See if we're running as the userid 'vb', and warn if not.
+    # See if we're running as the userid 'vbtk', and warn if not.
     my ($uname) = getpwuid($<);
-    if($uname ne 'vb')
+    if($uname ne 'vbtk')
     {
         print STDOUT "\n" .
             "It is recommended that you run all VB processes under a separate userid,\n" .
-            "such as 'vb'.  You are currently running with the userid '$uname'.\n";
+            "such as 'vbtk'.  You are currently running with the userid '$uname'.\n";
         $resp = prompt("Do you want to continue under this userid? ","n");
         exit 1 if($resp !~ /^y/i);
     }
@@ -418,9 +424,9 @@ sub install
             }
         };
         
-        print STDOUT "\nCopying files from '$installDir' to '$::VBHOME'\n";
+        print STDOUT "Copying files from '$installDir' to '$::VBHOME'\n";
         &find({ wanted => $filter, no_chdir => 1},@copyDirs);
-        
+
         # If the conf/vbc file doesn't yet exist, then copy one over and make
         # a rough attempt to configure it.
         if (! -f "$::VBCONF/vbc")
@@ -430,13 +436,14 @@ sub install
             $vbcText = $vbcObj->get;
         
             # Make a few changes to the vbc file
-            # $vbcText =~ s/^(\s+MasterVBServer\s+=>\s+)\'\w+\'/$1\'$::HOST\'/m;
             $vbcText =~ s/myhost1/$::HOST/mg;
         
             $vbcObj = new VBTK::File("$::VBCONF/vbc");
             $vbcObj->put($vbcText);
         }
         
+        &checkPermsAndLinks();
+
         print STDOUT "\n" .
             "You should now proceed with the installation by editing the\n" .
             "'conf/vbc' file.  Just read the comments for instructions.\n";
@@ -482,13 +489,39 @@ sub install
                 "the '$::VBCONF/vbc' file.\n";
         }
         
+        &checkPermsAndLinks();
+
         print STDOUT "\n" .
             "Configuration was successful!!  You can now startup the monitoring\n".
             "processes on this machine with the command '$::VBCONF/vbc start'\n";
     }
     else
     {
-        &fatal("Invalid response, must select 'M','S', or 'C'");
+        die("Invalid response, must select 'M','S', or 'C'");
+    }
+}
+
+#-------------------------------------------------------------------------------
+# Function:     checkPermsAndLinks
+# Description:  Turn on the executable bit on 'vbc' and setup the 'start', 'stop'
+#               'restart', and 'sync' links.
+# Input Parms:  None
+# Output Parms: None
+#-------------------------------------------------------------------------------
+sub checkPermsAndLinks
+{
+    my($dir,$link);
+    
+    # Turn on the executable bit on the vbc script
+    chmod 0755, "$::VBCONF/vbc";
+    
+    # Create symbolic links in both bin and conf
+    foreach $dir ($::VBCONF,$::VBBIN)
+    {
+        foreach $link ('start','stop','restart','sync')
+        {
+            symlink "../conf/vbc","$dir/$link";
+        }
     }
 }
 
@@ -498,16 +531,6 @@ __END__
 =head1 NAME
 
 VBTK - Virtual Brent Toolkit - A generic toolkit for system monitoring
-
-=head1 SUPPORTED PLATFORMS
-
-=over 4
-
-=item * 
-
-Solaris
-
-=back
 
 =head1 DESCRIPTION
 
@@ -549,19 +572,6 @@ based on status changes.
 There are also sub-classes of the VBTK::Actions module.  These provide convenient
 defaults for two common types of actions - email and paging.  See L<VBTK::Actions> 
 for more details.
-
-=item L<VBTK::RmtServer|VBTK::RmtServer>
-
-This module allows the definition of remote VB servers with which a heartbeat
-should be established.  This allows two VB servers to monitor each other as 
-well as their own objects.  See L<VBTK::RmtServer> for more details.
-
-=item L<VBTK::Templates|VBTK::Templates>
-
-This module allows the definition of templates which use name pattern matching
-to set defaults on VB objects as they are created.  Settable defaults include
-expiration time, status change actions, object description, etc.  See 
-L<VBTK::Templates> for more details.
 
 =item L<VBTK::Controller|VBTK::Controller>
 
@@ -643,7 +653,7 @@ server on a specified interval, measures the response
 time, and passes the result on to the L<VBTK::Parser|VBTK::Parser> module.
 It can also be configured to retrieve email with a specified Subject, and
 measure and store the round-trip time.  This is usually used together with the
-L<VBTK::Smtp>|VBTK::Smtp> module to test the full mail cycle.
+L<VBTK::Smtp|VBTK::Smtp> module to test the full mail cycle.
 
 =item L<VBTK::Log|VBTK::Log>
 
@@ -781,21 +791,28 @@ available from CPAN.
 =head2 REQUIRED DEPENDENCIES
 
 The following modules are required.  They are available from CPAN -
-http://www.cpan.org/modules
+http://www.cpan.org/modules.
 
 =over 4
 
-=item libwww-perl 
+=item Bundle::LWP
 
 =item L<Date::Manip|Date::Manip>
 
 =item L<Algorithm::Diff|Algorithm::Diff>
 
-=item L<Storable|Storable>
-
 =item L<File::Find|File::Find>
 
+=item L<Storable|Storable>
+
+=item L<Mail::Sendmail|Mail::Sendmail>
+
+=item L<Mail::POP3Client|Mail::POP3Client>
+
 =back
+
+The simplest way to install these is to just use 'perl -MCPAN -e shell'.  Once 
+in the shell, just type 'install Date::Manip', 'install Storable', etc.
 
 =head2 OPTIONAL DEPENDENCIES
 
@@ -808,27 +825,19 @@ installed.
 
 Allows for creation of RRD databases and dynamic generation of graphs
 if the rrdtool is installed along with it's dependencies.  You can find the
-source at http://www.rrdtool.com/index.html
+source at http://www.rrdtool.com/index.html .  I strongly recommend installing
+this!
 
 =item L<SNMP|SNMP>
 
 Allows for SNMP monitoring if the SNMP module is installed along 
-with it's dependencies.
+with it's dependencies.  This requires requires the Net-SNMP toolkit library
+available from http://sourceforge.net/projects/net-snmp .
 
 =item L<DBI|DBI>
 
 Allows for database monitoring via the DBI module, if the DBI module
 is installed along with it's dependencies.
-
-=item L<Mail::Sendmail|Mail::Sendmail>
-
-Allows for SMTP server monitoring if the Mail::Sendmail module is installed
-along with it's dependencies.
-
-=item L<Mail::POP3Client|Mail::POP3Client>
-
-Allows for POP3 server monitoring if the Mail::POP3Client module is installed
-along with it's dependencies.
 
 =back
 
@@ -884,6 +893,12 @@ their VBServer and you don't want this all going over the WAN.  In addition, the
 master VBServer and slave VBServer can be configured to heartbeat each other, so
 that in case one dies, the other can warn you. 
 
+=item Decide where you'll access the web interface from
+
+You can access the web interface from the Master node or from any Slave node.
+They will all show all the objects in one interface.  But don't expose this
+interface to the public internet, since I'm not sure about vulnerabilities.
+
 =back
 
 =head2 VBSERVER CONFIGURATION
@@ -937,22 +952,22 @@ obviously don't need to install anything there.
 
 =over 4
 
-=item Create a user and group 'vb'.
+=item Create a user and group 'vbtk'.
 
 If you're running this on a unix machine, you don't want to run it as superuser,
 so create a user 'vb' and group 'vb' to run all the processes under.
 
-    useradd vb 
-    groupadd vb
+    useradd vbtk 
+    groupadd vbtk
 
 =item Create a home directory.
 
 Create a home directory for the VBTK software.  I suggest '/usr/vbtk', which is
-the default.  Change this directory to be owned by the 'vb' user and to be the
-'vb' user's home directory.
+the default.  Change this directory to be owned by the 'vbtk' user and to be the
+'vbtk' user's home directory.
 
     mkdir /usr/vbtk; chown vb:vb /usr/vbtk
-    
+
 If you're going to use a directory other than '/usr/vbtk', then make sure you 
 set the environment variable $VBHOME to the new location.  Make sure this is
 always set before you run any scripts.
@@ -978,9 +993,27 @@ You can also look through the various modules in the
 L<Data Gathering Modules|VBTK/Data-Gathering Modules> section of this document
 for help on creating new config files.
 
+=head1 SECURITY
+
+Don't expose the web interface to the public internet!  I make no claims about 
+how secure it is.  There may be vulnerabilities which I don't know about.
+
 =head1 FAQ
 
 =over 4
+
+=item How do I delete an object?
+
+Before you can delete an object, make sure that there isn't a client process
+which is still sending sending a status for that object.  Otherwise it will 
+just get recreated with the next status submission.  If you're not sure which
+client process is setting the status, look under the 'Info' tab for that 
+object for the 'Script Name' and 'Running From' values.  This shows you 
+which script is setting the status.  Once you think you've fixed the script, 
+check the object history to see if it's still being updated.  If not, go to 
+the 'vbobj' directory, on the Master or Slave server to which this object is
+reported, and delete the sub-directory which matches the object name.  After
+about a minute, the object will disappear from the web interface.
 
 =item There are error messages in the VBServer log about the 'rrdupdate' 
 command failing.
@@ -989,15 +1022,16 @@ If you've changed the number of entries being passed in the
 L<RrdColumns|VBTK::Parser/item_RrdColumns> entry, or if you've changed the 
 L<CF|VBTK::Parser/CF> specification, then you probably need to rebuild
 the corresponding RRD database.  Look in the VBHOME/vbobj directory for a 
-directory named the same as the object and delete the RRD.db file.  It will 
-then be regenerated when the next batch of data arrives.
+directory named the same as the object and delete the RRD.db file.  Then 
+restart the client process which monitors the object and the RRD.db file 
+will be regenerated.
 
 =back
 
 =head1 OPTIONAL CUSTOMIZATION
 
 The VBTK toolkit is written such that additional data-gathering modules can be
-added on to it fairly easily.  See the 'examples/dg' sub directory under the VBTK
+added on to it fairly easily.  See the 'examples' sub directory under the VBTK
 home directory for examples of how to write your own data-gathering modules, or
 look at the code of the data-gathering modules listed above.
 
@@ -1011,13 +1045,6 @@ The @delta array used in the 'VBDetail' and 'LogDetail' parms of data-gathering
 arrays doesn't yet take into account 32-bit and 64-bit roll-over.  So you may get
 an occasional very large negative number when counters roll-over.  This will be
 fixed in a future release.
-
-=item Daylight savings time
-
-The object expiration routines don't yet handle the transition to daylight
-savings time, and so once a year, all the objects expire when the time jumps 
-ahead an hour.  I need to change the internals to use GMT instead.  This will
-be fixed in a future release
 
 =item Won't run on Windows
 
@@ -1036,9 +1063,8 @@ in a future release.
 
 =item Date::Manip timezone determination
 
-The VBServer process will die if Date::Manip can't determine the timezone. 
-Just set the TZ environment variable or create an /etc/timezone file.  See
-L<Date::Manip> for more details.
+The VBServer process will default to GMT if Date::Manip can't determine the 
+timezone.  See L<Date::Manip/Timezones> for details on how to set the Timezone.
 
 =back
 
@@ -1053,13 +1079,17 @@ I have several things in mind, but feel free to send suggestions.
 There needs to be a single place to go to see a log of all the actions fired
 recently.  In addtion, I would like to add the option of requiring actions
 to be acknowledged.  That way if your sysadmin misses the first page, it will
-keep paging every n minutes, until the log in and acknowledge the problem.  
-I'd also like to be able to nest actions within actions.
+keep paging every n minutes, until they log in and acknowledge the problem.  
 
-=item Cookie Handling in the VBTK::Http Module
+=item Persistent Cookie Handling in the VBTK::Http Module
 
 I'd like to add the option of saving the cookie database somewhere on disk,
 so that it doesn't get wiped out every time you restart.
+
+=item Admin page in web interface
+
+I'd like to add an 'Admin' page in the web interface to allow administrative
+actions such as deleting an object, resetting the RRD database, etc.
 
 =item MaxRepeat option for object history
 
@@ -1100,6 +1130,11 @@ I'd like to add a 'MaxRepeat' option for object history.
 =item L<VBTK::Parser|VBTK::Parser>
 
 =back
+
+=head1 SPECIAL THANKS
+
+And a special thanks to all the great perl authors who's libraries I 
+used to build this.  I couldn't have done it without you!  CPAN is great!
 
 =head1 AUTHOR
 

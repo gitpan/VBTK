@@ -5,8 +5,8 @@
 #                       Any changes made without RCS will be lost
 #
 #              $Source: /usr/local/cvsroot/vbtk/VBTK/Objects/History.pm,v $
-#            $Revision: 1.4 $
-#                $Date: 2002/01/25 16:42:06 $
+#            $Revision: 1.8 $
+#                $Date: 2002/03/04 20:53:07 $
 #              $Author: bhenry $
 #              $Locker:  $
 #               $State: Exp $
@@ -32,6 +32,18 @@
 #       REVISION HISTORY:
 #
 #       $Log: History.pm,v $
+#       Revision 1.8  2002/03/04 20:53:07  bhenry
+#       *** empty log message ***
+#
+#       Revision 1.7  2002/03/04 16:49:10  bhenry
+#       Changed requirement back to perl 5.6.0
+#
+#       Revision 1.6  2002/03/02 00:53:55  bhenry
+#       Documentation updates
+#
+#       Revision 1.5  2002/02/20 19:25:18  bhenry
+#       *** empty log message ***
+#
 #       Revision 1.4  2002/01/25 16:42:06  bhenry
 #       Changed to serialized filename to end in '.ser'
 #
@@ -47,7 +59,7 @@
 
 package VBTK::Objects::History;
 
-use 5.6.1;
+use 5.6.0;
 use strict;
 use warnings;
 # I like using undef as a value so I'm turning off the uninitialized warnings
@@ -88,7 +100,7 @@ sub new
     $self->set(@_);
 
     log("Setting up VB History Object for $self->{ObjName}, $self->{Timestamp}")
-        if ($VERBOSE > 1);
+        if ($VERBOSE > 3);
 
     # Only run this part if we're in VERBOSE mode, it's not really necessary, but
     # is just an extra check to make sure the right parameters are being passed.
@@ -274,16 +286,6 @@ __END__
 =head1 NAME
 
 VBTK::Objects::History - Internal module of VBTK
-
-=head1 SUPPORTED PLATFORMS
-
-=over 4
-
-=item * 
-
-Solaris
-
-=back
 
 =head1 SYNOPSIS
 
